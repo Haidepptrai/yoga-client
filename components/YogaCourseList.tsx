@@ -6,7 +6,7 @@ import { ThemedText } from "./ThemedText";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 
-export default function YogaClassList() {
+export default function YogaCourseList() {
   const [yogaClasses, setYogaClasses] = useState<YogaCourse[]>([]);
 
   const categories = ["Beginner", "Intermediate", "Advanced"];

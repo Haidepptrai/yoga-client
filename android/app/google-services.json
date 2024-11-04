@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "632751843399",
+    "project_id": "fresh-yoga-app",
+    "storage_bucket": "fresh-yoga-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632751843399:android:bed186e9a4e90b81cc2962",
+        "android_client_info": {
+          "package_name": "com.hainguyen.yogaadmin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "632751843399-bnn3l46lp6huneh8324thosrirsesnbn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hainguyen.yogaadmin",
+            "certificate_hash": "ad41a03652596007e2c3352ef7afdbc3c1d90667"
+          }
+        },
+        {
+          "client_id": "632751843399-bih66r5rqm1dk4abvv3jv2l090favkbs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1nxa-kJ98IXfPmH8KQAz_Kh2zA1OhKuo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "632751843399-bih66r5rqm1dk4abvv3jv2l090favkbs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
