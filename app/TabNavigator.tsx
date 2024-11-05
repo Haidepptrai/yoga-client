@@ -5,7 +5,10 @@ import TabBar from "../components/navigation/TabBar";
 
 export default function TabNavigator() {
   return (
-    <Tabs tabBar={(props) => <TabBar {...props} />}>
+    <Tabs
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TabBar {...props} />}
+    >
       <Tabs.Screen
         name="tabbed/index"
         options={{

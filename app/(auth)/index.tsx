@@ -50,7 +50,7 @@ const LoginScreen: React.FC = () => {
         // Log in user
         await signInWithEmailAndPassword(auth, email, password);
         console.log("Logged in successfully");
-        router.navigate("/(protected)/tabbed/");
+        router.navigate("/(protected)/tabbed");
       } else {
         // Attempt to create a new account
         await createUserWithEmailAndPassword(auth, email, password);

@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { IconButton } from "react-native-paper";
 import { ThemedText } from "@/components/ThemedText";
+import { router } from "expo-router";
 
 type HeroHeaderProps = {
   greeting?: string;
@@ -23,6 +24,11 @@ export default function HeroHeader({
         </ThemedText>
       </View>
       <View style={styles.iconContainer}>
+        <IconButton
+          icon="cart-outline"
+          size={24}
+          onPress={() => router.push("/cart")}
+        />
         <IconButton
           icon="bell-outline"
           size={24}

@@ -1,22 +1,24 @@
-import { Pressable, StyleSheet, PressableProps, TextStyle } from "react-native";
+// TabBarButton.tsx
+import { Pressable, StyleSheet, PressableProps } from "react-native";
 import React, { useEffect } from "react";
 import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
+import { MaterialIcons } from "@expo/vector-icons";
 
-// Define the type for icons
-const icons: {
-  "tabbed/index": (props: any) => React.JSX.Element;
-  "tabbed/profile": (props: any) => React.JSX.Element;
-} = {
-  "tabbed/index": (props) => <></>, // Replace with actual icons
-  "tabbed/profile": (props) => <></>, // Replace with actual icons
+const icons: Record<RouteName, (props: any) => React.JSX.Element> = {
+  "tabbed/index": (props) => (
+    <MaterialIcons name="home" size={24} color={props.color} />
+  ),
+  "tabbed/profile": (props) => (
+    <MaterialIcons name="person" size={24} color={props.color} />
+  ),
 };
 
-export type RouteName = "tabbed/index" | "tabbed/profile"; // Union type of route names
+export type RouteName = "tabbed/index" | "tabbed/profile";
 
 interface TabBarButtonProps extends PressableProps {
   isFocused: boolean;
@@ -35,7 +37,7 @@ const TabBarButton: React.FC<TabBarButtonProps> = ({
   const scale = useSharedValue(0);
 
   useEffect(() => {
-    scale.value = withSpring(isFocused ? 1 : 0, { duration: 350 });
+    scale.value = withTiming(isFocused ? 1 : 0, { duration: 350 });
   }, [scale, isFocused]);
 
   const animatedIconStyle = useAnimatedStyle(() => {
@@ -56,11 +58,9 @@ const TabBarButton: React.FC<TabBarButtonProps> = ({
   return (
     <Pressable {...props} style={styles.container}>
       <Animated.View style={[animatedIconStyle]}>
-        {icons[routeName]({ color })} {/* Type-safe access */}
+        {icons[routeName]({ color })}
       </Animated.View>
-      <Animated.Text
-        style={[{ color, fontSize: 11 } as TextStyle, animatedTextStyle]}
-      >
+      <Animated.Text style={[styles.text, { color }, animatedTextStyle]}>
         {label}
       </Animated.Text>
     </Pressable>
@@ -73,6 +73,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 4,
+  },
+  text: {
+    fontSize: 11,
   },
 });
 

@@ -11,5 +11,5 @@ export interface YogaCourse {
   description: string;
   isPublished: boolean;
 
-  category: string;
+  category?: string;
 }

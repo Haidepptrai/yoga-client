@@ -15,7 +15,7 @@ export default function YogaCourseCard({
 
   const handlePressToViewCourse = () => {
     router.push({
-      pathname: "(protected)/course-details/[id]",
+      pathname: "/course-details/[id]",
       params: { id: id.toString() },
     });
   };
