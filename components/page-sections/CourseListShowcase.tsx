@@ -2,78 +2,114 @@ import { YogaCourse } from "@/interface/YogaCourse";
 import React, { useEffect, useState } from "react";
 import { View, FlatList, StyleSheet, Dimensions } from "react-native";
 import YogaCourseCardAvailable from "../YogaCourseCardAvailable";
-
-// Mock data for the yoga courses
-const mockYogaCourses: YogaCourse[] = [
-  {
-    id: 1,
-    dayOfWeek: "Monday",
-    timeOfCourse: "09:00",
-    duration: 60,
-    capacity: 20,
-    pricePerClass: 15,
-    typeOfClass: "Vinyasa Yoga",
-    description: "A dynamic flow class focusing on breath and movement.",
-    isPublished: true,
-  },
-  {
-    id: 2,
-    dayOfWeek: "Tuesday",
-    timeOfCourse: "10:30",
-    duration: 45,
-    capacity: 15,
-    pricePerClass: 12,
-    typeOfClass: "Hatha Yoga",
-    description: "A gentle class perfect for beginners.",
-    isPublished: true,
-  },
-  {
-    id: 3,
-    dayOfWeek: "Wednesday",
-    timeOfCourse: "18:00",
-    duration: 90,
-    capacity: 25,
-    pricePerClass: 20,
-    typeOfClass: "Power Yoga",
-    description: "An intense class to build strength and stamina.",
-    isPublished: false,
-  },
-  {
-    id: 4,
-    dayOfWeek: "Thursday",
-    timeOfCourse: "07:00",
-    duration: 60,
-    capacity: 18,
-    pricePerClass: 15,
-    typeOfClass: "Restorative Yoga",
-    description: "A slow-paced class focusing on relaxation.",
-    isPublished: true,
-  },
-  {
-    id: 5,
-    dayOfWeek: "Friday",
-    timeOfCourse: "12:00",
-    duration: 50,
-    capacity: 12,
-    pricePerClass: 14,
-    typeOfClass: "Yin Yoga",
-    description: "A meditative class focusing on deep stretching.",
-    isPublished: true,
-  },
-];
+import { db } from "@/firebaseConfig";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
+  orderBy,
+} from "firebase/firestore";
 
 const CourseListShowcase = () => {
+  const [yogaCourses, setYogaCourses] = useState<YogaCourse[]>([]);
   const [screenHeight, setScreenHeight] = useState(
     Dimensions.get("window").height
   );
+  const [lastDocument, setLastDocument] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null); // Track the last fetched document with proper type
+  const [hasMore, setHasMore] = useState(true); // Track if there are more courses to load
+  const [loading, setLoading] = useState(false); // Track loading state to prevent duplicate calls
+  const pageSize = 5; // Number of courses to load per page
 
   useEffect(() => {
     const updateScreenHeight = () => {
       setScreenHeight(Dimensions.get("window").height);
     };
 
-    Dimensions.addEventListener("change", updateScreenHeight);
+    const subscription = Dimensions.addEventListener(
+      "change",
+      updateScreenHeight
+    );
+
+    // Initial fetch of yoga courses
+    fetchYogaCourses();
+
+    // Clean up event listener
+    return () => {
+      subscription.remove();
+    };
   }, []);
+
+  const fetchYogaCourses = async (
+    startAfterDoc: QueryDocumentSnapshot<DocumentData> | null = null
+  ) => {
+    if (loading || !hasMore) return; // Prevent multiple calls when loading or no more data
+    setLoading(true);
+
+    try {
+      // Construct query with pagination
+      let coursesQuery = query(
+        collection(db, "yoga_courses"),
+        where("published", "==", true),
+        where("deletedAt", "==", null),
+        orderBy("createdAt"),
+        limit(pageSize)
+      );
+
+      if (startAfterDoc) {
+        coursesQuery = query(coursesQuery, startAfter(startAfterDoc));
+      }
+
+      const querySnapshot = await getDocs(coursesQuery);
+
+      if (querySnapshot.docs.length > 0) {
+        const coursesData = querySnapshot.docs.map((doc) => ({
+          id: parseInt(doc.id),
+          dayOfWeek: doc.data().dayOfWeek || "Unknown",
+          timeOfCourse: doc.data().timeOfCourse || "00:00",
+          duration: doc.data().duration || 0,
+          capacity: doc.data().capacity || 0,
+          pricePerClass: doc.data().pricePerClass || 0,
+          typeOfClass: doc.data().typeOfClass || "Unknown",
+          description: doc.data().description || "",
+          isPublished: doc.data().published || false,
+        })) as YogaCourse[];
+
+        // Append new data to the existing list without duplicating items
+        setYogaCourses((prevCourses) => {
+          const newCourses = coursesData.filter(
+            (newCourse) =>
+              !prevCourses.some((prevCourse) => prevCourse.id === newCourse.id)
+          );
+          return [...prevCourses, ...newCourses];
+        });
+
+        setLastDocument(querySnapshot.docs[querySnapshot.docs.length - 1]);
+
+        // If fewer than pageSize documents were fetched, we've reached the end
+        if (querySnapshot.docs.length < pageSize) {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false); // No more documents
+      }
+    } catch (error) {
+      console.error("Error fetching yoga courses:", error);
+    } finally {
+      setLoading(false); // Reset loading state
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loading) {
+      fetchYogaCourses(lastDocument);
+    }
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -86,13 +122,16 @@ const CourseListShowcase = () => {
       paddingBottom: 20,
     },
   });
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={mockYogaCourses}
+        data={yogaCourses}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => <YogaCourseCardAvailable course={item} />}
         contentContainerStyle={styles.listContent}
+        onEndReached={handleLoadMore} // Trigger load more when end is reached
+        onEndReachedThreshold={0.5} // Adjust threshold as needed
       />
     </View>
   );

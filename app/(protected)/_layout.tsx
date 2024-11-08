@@ -1,14 +1,13 @@
 // app/(protected)/_layout.tsx
 import React, { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import TabNavigator from "../TabNavigator";
 
 export default function ProtectedLayout() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const segments = useSegments(); // Get the current route segments
 
   useEffect(() => {
     if (!loading && !user) {

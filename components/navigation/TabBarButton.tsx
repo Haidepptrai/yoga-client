@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { MaterialIcons } from "@expo/vector-icons";
+import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 
 const icons: Record<RouteName, (props: any) => React.JSX.Element> = {
   "tabbed/index": (props) => (
@@ -16,9 +16,15 @@ const icons: Record<RouteName, (props: any) => React.JSX.Element> = {
   "tabbed/profile": (props) => (
     <MaterialIcons name="person" size={24} color={props.color} />
   ),
+  "tabbed/search-class": (props) => (
+    <MaterialIcons name="search" size={24} color={props.color} />
+  ),
 };
 
-export type RouteName = "tabbed/index" | "tabbed/profile";
+export type RouteName =
+  | "tabbed/index"
+  | "tabbed/profile"
+  | "tabbed/search-class";
 
 interface TabBarButtonProps extends PressableProps {
   isFocused: boolean;
@@ -54,11 +60,19 @@ const TabBarButton: React.FC<TabBarButtonProps> = ({
     const opacity = interpolate(scale.value, [0, 1], [1, 0]);
     return { opacity };
   });
+  const IconComponent = icons[routeName];
+  if (!IconComponent) {
+    console.warn(`No icon found for route: ${routeName}`);
+  }
 
   return (
     <Pressable {...props} style={styles.container}>
       <Animated.View style={[animatedIconStyle]}>
-        {icons[routeName]({ color })}
+        {IconComponent ? (
+          IconComponent({ color })
+        ) : (
+          <AntDesign name="questioncircleo" size={26} color="gray" />
+        )}
       </Animated.View>
       <Animated.Text style={[styles.text, { color }, animatedTextStyle]}>
         {label}

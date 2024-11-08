@@ -21,6 +21,12 @@ export default function TabNavigator() {
           title: "Profile",
         }}
       />
+      <Tabs.Screen
+        name="tabbed/search-class"
+        options={{
+          title: "Search Classes",
+        }}
+      />
     </Tabs>
   );
 }

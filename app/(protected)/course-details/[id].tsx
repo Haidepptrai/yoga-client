@@ -7,6 +7,7 @@ import {
   Alert,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
 } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { db } from "@/firebaseConfig";
@@ -18,6 +19,9 @@ import {
   query,
   where,
   getDocs,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { Colors } from "@/constants/Colors";
 import { Button } from "react-native-paper";
@@ -42,14 +46,14 @@ interface YogaCourseDetails {
 }
 
 interface YogaClass {
-  id: number;
+  id: string;
   classDate: string;
   teacher: string;
   courseId: number;
   comment: string;
 }
 
-export default function CourseDetails() {
+const CourseDetails = () => {
   const route = useRoute<RouteProp<{ params: { id: string } }, "params">>();
   const { id } = route.params;
   const [course, setCourse] = useState<YogaCourseDetails | null>(null);
@@ -57,7 +61,12 @@ export default function CourseDetails() {
   const [isJoined, setIsJoined] = useState<boolean>(false);
   const [availableClasses, setAvailableClasses] = useState<YogaClass[]>([]);
   const [showClasses, setShowClasses] = useState<boolean>(false);
+  const [lastClassDoc, setLastClassDoc] =
+    useState<QueryDocumentSnapshot | null>(null);
+  const [loadingMoreClasses, setLoadingMoreClasses] = useState<boolean>(false);
+  const [hasMoreClasses, setHasMoreClasses] = useState<boolean>(true);
   const { user } = useAuth();
+  const pageSize = 5; // Page size for lazy loading
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -124,28 +133,62 @@ export default function CourseDetails() {
     }
   };
 
-  const checkoutClasses = async () => {
+  const fetchAvailableClasses = async (
+    startAfterDoc: QueryDocumentSnapshot | null = null
+  ) => {
+    if (loadingMoreClasses || !hasMoreClasses) return;
+
+    setLoadingMoreClasses(true);
+
     try {
       const classesRef = collection(db, "yoga_sessions");
-      const q = query(classesRef, where("courseId", "==", Number(id)));
-      const querySnapshot = await getDocs(q);
-      console.log("querySnapshot", querySnapshot);
-      const classes = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        classDate: doc.data().classDate,
-        teacher: doc.data().teacher,
-        courseId: doc.data().courseId,
-        comment: doc.data().comment,
-      }));
+      const classesQuery = startAfterDoc
+        ? query(
+            classesRef,
+            where("courseId", "==", Number(id)),
+            limit(pageSize),
+            startAfter(startAfterDoc)
+          )
+        : query(
+            classesRef,
+            where("courseId", "==", Number(id)),
+            limit(pageSize)
+          );
 
-      setAvailableClasses(classes);
-      setShowClasses(true);
+      const querySnapshot = await getDocs(classesQuery);
+
+      if (querySnapshot.docs.length > 0) {
+        const classes = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          classDate: doc.data().classDate,
+          teacher: doc.data().teacher,
+          courseId: doc.data().courseId,
+          comment: doc.data().comment,
+        })) as YogaClass[];
+
+        setAvailableClasses((prevClasses) => [...prevClasses, ...classes]);
+        setLastClassDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+
+        if (querySnapshot.docs.length < pageSize) {
+          setHasMoreClasses(false); // No more classes to load
+        }
+      } else {
+        setHasMoreClasses(false); // No more classes available
+      }
     } catch (error) {
       console.error("Error fetching available classes:", error);
+    } finally {
+      setLoadingMoreClasses(false);
     }
   };
 
-  const addToCart = async (classId: number) => {
+  const checkoutClasses = () => {
+    setAvailableClasses([]);
+    setShowClasses(true);
+    fetchAvailableClasses();
+  };
+
+  const addToCart = async (classId: string) => {
     try {
       if (!user) {
         Alert.alert(
@@ -169,6 +212,20 @@ export default function CourseDetails() {
     }
   };
 
+  const renderClassItem = ({ item }: { item: YogaClass }) => (
+    <View key={item.id} style={styles.classItem}>
+      <Text style={styles.classText}>Date: {item.classDate}</Text>
+      <Text style={styles.classText}>Teacher: {item.teacher}</Text>
+      <Text style={styles.classComment}>Comment: {item.comment}</Text>
+      <TouchableOpacity
+        style={styles.addToCartButton}
+        onPress={() => addToCart(item.id)}
+      >
+        <Text style={styles.addToCartText}>Add to Cart</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -182,12 +239,15 @@ export default function CourseDetails() {
     return <Text style={styles.error}>Course not found</Text>;
   }
 
-  const startTime = new Date(`2023-01-01T${course.timeOfCourse}`);
-  const endTime = new Date(startTime.getTime() + course.duration * 60000);
-  const formattedEndTime = `${endTime
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${endTime.getMinutes().toString().padStart(2, "0")}`;
+  const formattedEndTime = (() => {
+    if (!course) return null;
+    const startTime = new Date(`2023-01-01T${course.timeOfCourse}`);
+    const endTime = new Date(startTime.getTime() + course.duration * 60000);
+    return `${endTime.getHours().toString().padStart(2, "0")}:${endTime
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
+  })();
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -236,15 +296,13 @@ export default function CourseDetails() {
       {/* Action Button */}
       <View style={styles.buttonContainer}>
         {isJoined ? (
-          <>
-            <Button
-              mode="contained"
-              style={styles.checkoutButton}
-              onPress={checkoutClasses}
-            >
-              Checkout Available Class This Week
-            </Button>
-          </>
+          <Button
+            mode="contained"
+            style={styles.checkoutButton}
+            onPress={checkoutClasses}
+          >
+            Checkout Available Classes This Week
+          </Button>
         ) : (
           <Button
             mode="contained"
@@ -255,34 +313,27 @@ export default function CourseDetails() {
           </Button>
         )}
       </View>
-      <ScrollView>
-        {showClasses && (
-          <View style={styles.classListContainer}>
-            {availableClasses.map((yogaClass) => (
-              <View key={yogaClass.id} style={styles.classItem}>
-                <Text style={styles.classText}>
-                  Date: {yogaClass.classDate}
-                </Text>
-                <Text style={styles.classText}>
-                  Teacher: {yogaClass.teacher}
-                </Text>
-                <Text style={styles.classComment}>
-                  Comment: {yogaClass.comment}
-                </Text>
-                <TouchableOpacity
-                  style={styles.addToCartButton}
-                  onPress={() => addToCart(yogaClass.id)}
-                >
-                  <Text style={styles.addToCartText}>Add to Cart</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+
+      {/* Lazy Loaded Class List */}
+      {showClasses && (
+        <FlatList
+          data={availableClasses}
+          renderItem={renderClassItem}
+          keyExtractor={(item) => item.id}
+          onEndReached={() => fetchAvailableClasses(lastClassDoc)} // Trigger lazy loading
+          onEndReachedThreshold={0.5} // Adjust as needed
+          ListFooterComponent={
+            loadingMoreClasses ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : null
+          }
+        />
+      )}
     </ScrollView>
   );
-}
+};
+
+export default CourseDetails;
 
 const styles = StyleSheet.create({
   container: {
@@ -351,6 +402,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 20,
+    color: Colors.white,
   },
   learnTitle: {
     fontSize: 18,
