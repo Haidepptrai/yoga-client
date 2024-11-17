@@ -1,46 +1,38 @@
 import SearchBar from "@/components/SearchBar";
+import { YogaSession } from "@/interface/YogaSession";
 import React, { useState } from "react";
-import {
-  View,
-  FlatList,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { View, FlatList, Text, StyleSheet } from "react-native";
+import { useAuth } from "@/context/AuthContext";
+import { Colors } from "@/constants/Colors";
+import YogaSessionCard from "@/components/YogaSessionCard";
+import { addToCart } from "@/utils/addToCart";
 
 const SearchScreen = () => {
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<YogaSession[]>([]);
+  const { user } = useAuth();
+
+  const handleAddToCart = (classId: number) => {
+    if (user) {
+      addToCart(user.uid, classId);
+    }
+  };
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.container}>
       <SearchBar onSearchResults={setResults} />
       <FlatList
         data={results}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.type}>
-                {item.typeOfClass || "Unknown Class"}
-              </Text>
-              <Text style={styles.date}>
-                {item.classDate || "No Date"} - {item.timeOfCourse || "No Time"}
-              </Text>
-            </View>
-            <View style={styles.cardBody}>
-              <Text style={styles.description}>
-                {item.description || "No description available"}
-              </Text>
-            </View>
-            <View style={styles.cardFooter}>
-              <Text style={styles.teacher}>
-                {item.teacher || "Unknown Teacher"}
-              </Text>
-              <Text style={styles.duration}>
-                {item.duration ? `${item.duration} mins` : "No Duration"}
-              </Text>
-            </View>
-          </TouchableOpacity>
+          <YogaSessionCard
+            typeOfClass={item.typeOfClass}
+            classDate={item.classDate}
+            timeOfCourse={item.timeOfCourse}
+            description={item.description}
+            teacher={item.teacher}
+            duration={item.duration}
+            onAddToCart={() => handleAddToCart(item.id)}
+          />
         )}
         ListEmptyComponent={
           <Text style={styles.emptyMessage}>No classes available</Text>
@@ -53,22 +45,74 @@ const SearchScreen = () => {
 export default SearchScreen;
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
     flex: 1,
     padding: 16,
+    backgroundColor: Colors.background,
+    gap: 16,
   },
-  resultItem: {
-    padding: 16,
-    backgroundColor: "#FFF",
+  card: {
+    backgroundColor: Colors.cardBackground,
     borderRadius: 8,
-    marginBottom: 8,
-    shadowColor: "#000",
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: Colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 5,
-    elevation: 3,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  title: {
-    fontSize: 18,
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  type: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+  },
+  date: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  cardBody: {
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  teacher: {
+    fontSize: 14,
+    color: Colors.textAccent,
+    fontStyle: "italic",
+  },
+  duration: {
+    fontSize: 14,
+    color: Colors.textAccent,
+  },
+  emptyMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    color: Colors.primary,
+    marginTop: 20,
+  },
+  addToCartButton: {
+    marginTop: 16,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  addToCartText: {
+    color: "#FFF",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });

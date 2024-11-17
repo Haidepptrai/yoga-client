@@ -1,7 +1,6 @@
 import { YogaCourse } from "@/interface/YogaCourse";
 import React, { useEffect, useState } from "react";
 import { View, FlatList, StyleSheet, Dimensions } from "react-native";
-import YogaCourseCardAvailable from "../YogaCourseCardAvailable";
 import { db } from "@/firebaseConfig";
 import {
   collection,
@@ -14,8 +13,10 @@ import {
   DocumentData,
   orderBy,
 } from "firebase/firestore";
+import YogaCourseCard from "@/components/YogaCourseCard";
+import { ThemedText } from "@/components/ThemedText";
 
-const CourseListShowcase = () => {
+const CourseListAvailable = () => {
   const [yogaCourses, setYogaCourses] = useState<YogaCourse[]>([]);
   const [screenHeight, setScreenHeight] = useState(
     Dimensions.get("window").height
@@ -118,23 +119,25 @@ const CourseListShowcase = () => {
       paddingVertical: 10,
     },
     listContent: {
-      paddingHorizontal: 16,
       paddingBottom: 20,
     },
   });
 
   return (
     <View style={styles.container}>
+      <ThemedText type="title">Available Courses</ThemedText>
       <FlatList
         data={yogaCourses}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => <YogaCourseCardAvailable course={item} />}
+        renderItem={({ item }) => (
+          <YogaCourseCard course={item} context={"available"} />
+        )}
         contentContainerStyle={styles.listContent}
-        onEndReached={handleLoadMore} // Trigger load more when end is reached
-        onEndReachedThreshold={0.5} // Adjust threshold as needed
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
       />
     </View>
   );
 };
 
-export default CourseListShowcase;
+export default CourseListAvailable;

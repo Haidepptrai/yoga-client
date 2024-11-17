@@ -16,15 +16,15 @@ export default function TabNavigator() {
         }}
       />
       <Tabs.Screen
-        name="tabbed/profile"
-        options={{
-          title: "Profile",
-        }}
-      />
-      <Tabs.Screen
         name="tabbed/search-class"
         options={{
           title: "Search Classes",
+        }}
+      />
+      <Tabs.Screen
+        name="tabbed/profile"
+        options={{
+          title: "Profile",
         }}
       />
     </Tabs>

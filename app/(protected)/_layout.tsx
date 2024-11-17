@@ -23,8 +23,7 @@ export default function ProtectedLayout() {
       </View>
     );
   }
-  // Conditional rendering: Use TabNavigator for certain paths and StackNavigator for others
-  // return segments.includes("tabbed") ? <TabNavigator /> : <StackNavigator />;
+
   return (
     <>
       <TabNavigator />

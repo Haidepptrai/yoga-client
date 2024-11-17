@@ -7,6 +7,7 @@ import HeaderWithBackButton from "@/components/navigation/HeaderWithBackButton";
 import { z } from "zod";
 import { Colors } from "@/constants/Colors";
 import { getAuth } from "firebase/auth";
+import { ThemedText } from "@/components/ThemedText";
 
 // Zod schema for validation
 const profileSchema = z.object({
@@ -86,7 +87,7 @@ export default function ProfileScreen() {
 
       // If accessed from Cart, navigate back to Cart after saving
       if (fromCart) {
-        router.push("/(protected)cart");
+        router.push("/(protected)/cart");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -97,7 +98,7 @@ export default function ProfileScreen() {
   const handleBackPress = () => {
     // Navigate back to the appropriate screen
     if (fromCart) {
-      router.push("/(protected)cart");
+      router.push("/(protected)/cart");
     } else {
       router.back();
     }
@@ -112,48 +113,51 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View>
       <HeaderWithBackButton
         title="Edit Profile"
         onBackPress={handleBackPress}
       />
+      <View style={styles.container}>
+        <ThemedText type="title">User Profile</ThemedText>
+        <Text style={styles.label}>Email (non-editable)</Text>
+        <TextInput
+          style={[styles.input, styles.disabledInput]}
+          value={profile.email}
+          editable={false}
+        />
 
-      <Text style={styles.label}>Email (non-editable)</Text>
-      <TextInput
-        style={[styles.input, styles.disabledInput]}
-        value={profile.email}
-        editable={false}
-      />
+        <Text style={styles.label}>Name</Text>
+        <TextInput
+          style={styles.input}
+          value={profile.name}
+          onChangeText={(text) =>
+            setProfile((prev) => ({ ...prev, name: text }))
+          }
+        />
 
-      <Text style={styles.label}>Name</Text>
-      <TextInput
-        style={styles.input}
-        value={profile.name}
-        onChangeText={(text) => setProfile((prev) => ({ ...prev, name: text }))}
-      />
+        <Text style={styles.label}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={profile.phone}
+          onChangeText={(text) =>
+            setProfile((prev) => ({ ...prev, phone: text }))
+          }
+          keyboardType="phone-pad"
+        />
 
-      <Text style={styles.label}>Phone</Text>
-      <TextInput
-        style={styles.input}
-        value={profile.phone}
-        onChangeText={(text) =>
-          setProfile((prev) => ({ ...prev, phone: text }))
-        }
-        keyboardType="phone-pad"
-      />
-
-      <Button
-        title="Save Profile"
-        onPress={handleSaveProfile}
-        color={Colors.primary}
-      />
+        <Button
+          title="Save Profile"
+          onPress={handleSaveProfile}
+          color={Colors.primary}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
     backgroundColor: Colors.background,
   },

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, FlatList, StyleSheet } from "react-native";
-import YogaCourseCard from "./YogaCourseCard";
+import YogaCourseCard from "../../YogaCourseCard";
 import { YogaCourse } from "@/interface/YogaCourse";
-import { ThemedText } from "./ThemedText";
+import { ThemedText } from "../../ThemedText";
 import {
   collection,
   getDocs,
@@ -12,12 +12,11 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
-import { useAuth } from "@/context/AuthContext"; // Assuming you have a useAuth hook
+import { useAuth } from "@/context/AuthContext";
 
-export default function YogaCourseList() {
+export default function UserCourseList() {
   const [yogaClasses, setYogaClasses] = useState<YogaCourse[]>([]);
-  const { user } = useAuth(); // Get the current user
-  const categories = ["Beginner", "Intermediate", "Advanced"];
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,10 +45,8 @@ export default function YogaCourseList() {
 
           if (courseSnap.exists()) {
             return {
-              ...(courseSnap.data() as YogaCourse), // Cast doc.data() to YogaCourse
+              ...(courseSnap.data() as YogaCourse),
               id: courseId,
-              category:
-                categories[Math.floor(Math.random() * categories.length)], // Assign random category
             };
           }
           return null;
@@ -68,27 +65,8 @@ export default function YogaCourseList() {
     fetchData();
   }, [user]);
 
-  const colors = [
-    "#FAD7A0",
-    "#FAD1C8",
-    "#A5D6A7",
-    "#C5CAE9",
-    "#FFD700",
-    "#8A2BE2",
-    "#FF69B4",
-  ];
-
-  const getRandomColor = () => {
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
   const renderItem = ({ item }: { item: YogaCourse }) => (
-    <YogaCourseCard
-      id={item.id}
-      title={item.typeOfClass}
-      category={item.category}
-      color={getRandomColor()}
-    />
+    <YogaCourseCard course={item} context="joined" />
   );
 
   return (
@@ -103,7 +81,6 @@ export default function YogaCourseList() {
         keyExtractor={(item) => item.id.toString()}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
       />
     </View>
   );
@@ -111,21 +88,14 @@ export default function YogaCourseList() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 16,
-    backgroundColor: "#f9f9f9",
     gap: 8,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
-    paddingHorizontal: 16,
   },
   viewAll: {
     fontSize: 14,
     color: "#888",
-  },
-  listContainer: {
-    paddingLeft: 16,
   },
 });
