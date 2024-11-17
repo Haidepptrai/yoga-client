@@ -1,23 +1,26 @@
 import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
-import HeroHeader from "@/components/HeroHeader";
-import YogaCourseList from "@/components/YogaCourseList";
-import CourseListShowcase from "@/components/page-sections/CourseListShowcase";
+import HeroHeader from "@/components/page-sections/home-page/HeroHeader";
+import UserCourseList from "@/components/page-sections/home-page/UserCourseList";
+import { useAuth } from "@/context/AuthContext";
+import CourseListAvailable from "@/components/page-sections/home-page/CourseListAvailable";
 
 const HomePageScreen = () => {
+  const { user } = useAuth();
+
   return (
     <ScrollView contentContainerStyle={styles.scrollViewContent}>
-      <HeroHeader userName={""} />
-      <YogaCourseList />
-      <CourseListShowcase />
+      <HeroHeader userName={user?.email ?? "User"} />
+      <UserCourseList />
+      <CourseListAvailable />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   scrollViewContent: {
-    padding: 16, // Adjust padding as needed
-    marginBottom: 100,
+    padding: 16,
+    gap: 16,
   },
 });
 

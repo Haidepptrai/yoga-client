@@ -2,11 +2,9 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
   ActivityIndicator,
   Alert,
   StyleSheet,
-  TouchableOpacity,
   FlatList,
 } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
@@ -22,11 +20,15 @@ import {
   limit,
   startAfter,
   QueryDocumentSnapshot,
+  orderBy,
 } from "firebase/firestore";
 import { Colors } from "@/constants/Colors";
-import { Button } from "react-native-paper";
 import HeaderWithBackButton from "@/components/navigation/HeaderWithBackButton";
 import { useAuth } from "@/context/AuthContext";
+import { YogaSession } from "@/interface/YogaSession";
+import YogaSessionCard from "@/components/YogaSessionCard";
+import { addToCart } from "@/utils/addToCart";
+import CustomButton from "@/components/CustomButton";
 
 interface YogaCourseDetails {
   id: number;
@@ -45,28 +47,19 @@ interface YogaCourseDetails {
   updatedAt: number;
 }
 
-interface YogaClass {
-  id: string;
-  classDate: string;
-  teacher: string;
-  courseId: number;
-  comment: string;
-}
-
 const CourseDetails = () => {
   const route = useRoute<RouteProp<{ params: { id: string } }, "params">>();
   const { id } = route.params;
   const [course, setCourse] = useState<YogaCourseDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isJoined, setIsJoined] = useState<boolean>(false);
-  const [availableClasses, setAvailableClasses] = useState<YogaClass[]>([]);
-  const [showClasses, setShowClasses] = useState<boolean>(false);
+  const [availableClasses, setAvailableClasses] = useState<YogaSession[]>([]);
   const [lastClassDoc, setLastClassDoc] =
     useState<QueryDocumentSnapshot | null>(null);
   const [loadingMoreClasses, setLoadingMoreClasses] = useState<boolean>(false);
   const [hasMoreClasses, setHasMoreClasses] = useState<boolean>(true);
   const { user } = useAuth();
-  const pageSize = 5; // Page size for lazy loading
+  const pageSize = 5;
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -142,38 +135,41 @@ const CourseDetails = () => {
 
     try {
       const classesRef = collection(db, "yoga_sessions");
-      const classesQuery = startAfterDoc
-        ? query(
-            classesRef,
-            where("courseId", "==", Number(id)),
-            limit(pageSize),
-            startAfter(startAfterDoc)
-          )
-        : query(
-            classesRef,
-            where("courseId", "==", Number(id)),
-            limit(pageSize)
-          );
 
-      const querySnapshot = await getDocs(classesQuery);
+      // Base query with explicit orderBy and where clause
+      let baseQuery = query(
+        classesRef,
+        where("courseId", "==", Number(id)),
+        orderBy("classDate", "asc"), // Ensure explicit order by 'classDate'
+        limit(pageSize)
+      );
+
+      // Add pagination if startAfterDoc is valid
+      if (startAfterDoc && startAfterDoc instanceof QueryDocumentSnapshot) {
+        baseQuery = query(baseQuery, startAfter(startAfterDoc));
+      }
+
+      const querySnapshot = await getDocs(baseQuery);
 
       if (querySnapshot.docs.length > 0) {
         const classes = querySnapshot.docs.map((doc) => ({
           id: doc.id,
-          classDate: doc.data().classDate,
-          teacher: doc.data().teacher,
-          courseId: doc.data().courseId,
-          comment: doc.data().comment,
-        })) as YogaClass[];
+          typeOfClass: course?.typeOfClass,
+          duration: course?.duration,
+          timeOfCourse: course?.timeOfCourse,
+          ...doc.data(),
+        })) as unknown as YogaSession[];
 
+        // Update state with fetched data
         setAvailableClasses((prevClasses) => [...prevClasses, ...classes]);
         setLastClassDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
 
+        // If fewer than the pageSize documents are fetched, no more classes are left
         if (querySnapshot.docs.length < pageSize) {
-          setHasMoreClasses(false); // No more classes to load
+          setHasMoreClasses(false);
         }
       } else {
-        setHasMoreClasses(false); // No more classes available
+        setHasMoreClasses(false);
       }
     } catch (error) {
       console.error("Error fetching available classes:", error);
@@ -182,48 +178,23 @@ const CourseDetails = () => {
     }
   };
 
-  const checkoutClasses = () => {
-    setAvailableClasses([]);
-    setShowClasses(true);
-    fetchAvailableClasses();
-  };
-
-  const addToCart = async (classId: string) => {
-    try {
-      if (!user) {
-        Alert.alert(
-          "Error",
-          "You must be logged in to add a class to the cart."
-        );
-        return;
-      }
-
-      const cartRef = doc(db, "user_cart", `${user.uid}_${classId}`);
-      await setDoc(cartRef, {
-        userId: user.uid,
-        classId,
-        addedAt: Date.now(),
-      });
-
-      Alert.alert("Success", "Class added to cart!");
-    } catch (error) {
-      console.error("Error adding class to cart:", error);
-      Alert.alert("Error", "Could not add class to cart. Please try again.");
+  const handleAddToCart = (classId: number) => {
+    if (user) {
+      addToCart(user.uid, classId);
     }
   };
 
-  const renderClassItem = ({ item }: { item: YogaClass }) => (
-    <View key={item.id} style={styles.classItem}>
-      <Text style={styles.classText}>Date: {item.classDate}</Text>
-      <Text style={styles.classText}>Teacher: {item.teacher}</Text>
-      <Text style={styles.classComment}>Comment: {item.comment}</Text>
-      <TouchableOpacity
-        style={styles.addToCartButton}
-        onPress={() => addToCart(item.id)}
-      >
-        <Text style={styles.addToCartText}>Add to Cart</Text>
-      </TouchableOpacity>
-    </View>
+  const renderClassItem = ({ item }: { item: YogaSession }) => (
+    <YogaSessionCard
+      key={item.id}
+      typeOfClass={item.typeOfClass || "Unknown Class"}
+      classDate={item.classDate || "No Date"}
+      timeOfCourse={item.timeOfCourse || "No Time"}
+      description={item.description || "No description available"}
+      teacher={item.teacher || "Unknown Teacher"}
+      duration={item.duration || null}
+      onAddToCart={() => handleAddToCart(Number(item.id))}
+    />
   );
 
   if (loading) {
@@ -239,97 +210,60 @@ const CourseDetails = () => {
     return <Text style={styles.error}>Course not found</Text>;
   }
 
-  const formattedEndTime = (() => {
-    if (!course) return null;
-    const startTime = new Date(`2023-01-01T${course.timeOfCourse}`);
-    const endTime = new Date(startTime.getTime() + course.duration * 60000);
-    return `${endTime.getHours().toString().padStart(2, "0")}:${endTime
-      .getMinutes()
-      .toString()
-      .padStart(2, "0")}`;
-  })();
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <HeaderWithBackButton title="Course Details" />
-
-      <View style={styles.headerContainer}>
-        <Text style={styles.title}>{course.title}</Text>
-        <Text style={styles.category}>{course.category}</Text>
-      </View>
-
-      {/* Course About Card */}
-      <View style={styles.aboutCard}>
-        <Text style={styles.sectionTitle}>Course About</Text>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Course name:</Text>
-          <Text style={styles.detailValue}>{course.typeOfClass}</Text>
+    <FlatList
+      ListHeaderComponent={
+        <View>
+          <HeaderWithBackButton title="Course Details" />
+          <View style={styles.aboutCard}>
+            <Text style={styles.sectionTitle}>Course About</Text>
+            <View style={styles.detailsRow}>
+              <Text style={styles.detailLabel}>Course name:</Text>
+              <Text style={styles.detailValue}>{course.typeOfClass}</Text>
+            </View>
+            <View style={styles.detailsRow}>
+              <Text style={styles.detailLabel}>Duration:</Text>
+              <Text style={styles.detailValue}>{course.duration} mins</Text>
+            </View>
+            <View style={styles.detailsRow}>
+              <Text style={styles.detailLabel}>Course Fee:</Text>
+              <Text style={styles.detailValue}>${course.pricePerClass}</Text>
+            </View>
+          </View>
+          <Text style={styles.learnTitle}>Course Description</Text>
+          <Text style={styles.description}>{course.description}</Text>
+          <View style={styles.buttonContainer}>
+            {isJoined ? (
+              <CustomButton
+                label="Checkout Available Classes This Week"
+                onPress={fetchAvailableClasses}
+                style={styles.checkoutButton}
+                textColor="#FFF"
+              />
+            ) : (
+              <CustomButton
+                label="JOIN NOW"
+                onPress={joinCourse}
+                style={styles.joinNowButton}
+                textColor="#FFF"
+              />
+            )}
+          </View>
         </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Duration:</Text>
-          <Text style={styles.detailValue}>{course.duration} mins</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Course Fee:</Text>
-          <Text style={styles.detailValue}>${course.pricePerClass}</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Time:</Text>
-          <Text style={styles.detailValue}>
-            {course.timeOfCourse} - {formattedEndTime}
-          </Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Day of Week:</Text>
-          <Text style={styles.detailValue}>{course.dayOfWeek}</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Capacity:</Text>
-          <Text style={styles.detailValue}>{course.capacity} spots</Text>
-        </View>
-      </View>
-
-      {/* Course Description Section */}
-      <Text style={styles.learnTitle}>Course Description</Text>
-      <Text style={styles.description}>{course.description}</Text>
-
-      {/* Action Button */}
-      <View style={styles.buttonContainer}>
-        {isJoined ? (
-          <Button
-            mode="contained"
-            style={styles.checkoutButton}
-            onPress={checkoutClasses}
-          >
-            Checkout Available Classes This Week
-          </Button>
-        ) : (
-          <Button
-            mode="contained"
-            style={styles.joinNowButton}
-            onPress={joinCourse}
-          >
-            JOIN NOW
-          </Button>
-        )}
-      </View>
-
-      {/* Lazy Loaded Class List */}
-      {showClasses && (
-        <FlatList
-          data={availableClasses}
-          renderItem={renderClassItem}
-          keyExtractor={(item) => item.id}
-          onEndReached={() => fetchAvailableClasses(lastClassDoc)} // Trigger lazy loading
-          onEndReachedThreshold={0.5} // Adjust as needed
-          ListFooterComponent={
-            loadingMoreClasses ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
-            ) : null
-          }
-        />
-      )}
-    </ScrollView>
+      }
+      data={availableClasses}
+      renderItem={renderClassItem}
+      keyExtractor={(item) => item.id.toString()}
+      onEndReached={() => {
+        fetchAvailableClasses(lastClassDoc);
+      }}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={
+        loadingMoreClasses ? (
+          <ActivityIndicator size="small" color={Colors.primary} />
+        ) : null
+      }
+    />
   );
 };
 
@@ -337,23 +271,13 @@ export default CourseDetails;
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    padding: 20,
     backgroundColor: Colors.background,
-  },
-  headerContainer: {
-    alignItems: "center",
-    marginBottom: 16,
+    padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
     color: Colors.textPrimary,
-  },
-  category: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    fontStyle: "italic",
   },
   aboutCard: {
     padding: 20,
@@ -432,7 +356,6 @@ const styles = StyleSheet.create({
     color: Colors.secondary,
     textAlign: "center",
   },
-  // New styles for class list display
   classListContainer: {
     marginTop: 16,
   },

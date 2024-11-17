@@ -23,16 +23,10 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { useRouter } from "expo-router";
-
-interface YogaSession {
-  id: string;
-  classDate: string;
-  teacher: string;
-  comment: string;
-  courseId: string;
-}
+import { YogaSession } from "@/interface/YogaSession";
 
 interface CourseDetails {
+  id: number;
   timeOfCourse: string; // Start time as HH:MM (e.g., "09:00")
   duration: number; // Duration in minutes
 }
@@ -61,16 +55,23 @@ const CartScreen: React.FC = () => {
         const cartQuery = query(cartRef, where("userId", "==", user.uid));
         const cartSnapshot = await getDocs(cartQuery);
 
-        // Collect class IDs from the user's cart
-        const classIds = cartSnapshot.docs.map((doc) => doc.data().classId);
+        // Collect class IDs from the user's cart (always as numbers)
+        const classIds = cartSnapshot.docs.map(
+          (doc) => doc.data().classId as number
+        );
+
+        console.log("Fetched classIds:", classIds);
 
         // Step 2: Fetch the class details from `yoga_sessions` using the class IDs
-        const sessionPromises = classIds.map(async (classId: string) => {
-          const sessionRef = doc(db, "yoga_sessions", classId);
+        const sessionPromises = classIds.map(async (classId) => {
+          const sessionRef = doc(db, "yoga_sessions", String(classId)); // Convert to string for Firestore
           const sessionSnap = await getDoc(sessionRef);
 
           if (sessionSnap.exists()) {
-            return { id: sessionSnap.id, ...sessionSnap.data() } as YogaSession;
+            return {
+              id: sessionSnap.id,
+              ...sessionSnap.data(),
+            } as unknown as YogaSession;
           }
           return null;
         });
@@ -87,7 +88,10 @@ const CartScreen: React.FC = () => {
           const courseSnap = await getDoc(courseRef);
 
           if (courseSnap.exists()) {
-            return { id: courseId, ...courseSnap.data() } as CourseDetails;
+            return {
+              id: courseId,
+              ...courseSnap.data(),
+            } as unknown as CourseDetails;
           }
           return null;
         });
@@ -142,12 +146,11 @@ const CartScreen: React.FC = () => {
         } else {
           Alert.alert("Success", "Proceeding to checkout...");
 
-          // Step 1: Retrieve and delete all classes from `user_cart`
+          // Retrieve and delete all classes from `user_cart`
           const cartRef = collection(db, "user_cart");
           const cartQuery = query(cartRef, where("userId", "==", user.uid));
           const cartSnapshot = await getDocs(cartQuery);
 
-          // Step 2: For each class in the cart, add it to `user_joined_class`
           const joinedClassPromises = cartSnapshot.docs.map(async (cartDoc) => {
             const { classId, addedAt } = cartDoc.data();
 
@@ -155,25 +158,21 @@ const CartScreen: React.FC = () => {
             const joinedClassRef = doc(
               db,
               "user_joined_class",
-              `${user.uid}_${classId}`
+              `${user.uid}_${classId}` // Use classId as number
             );
             await setDoc(joinedClassRef, {
               userId: user.uid,
               classId,
               joinedAt: Date.now(),
-              addedAt, // Optional: keeping the original added time
+              addedAt,
             });
 
             // Delete the class from `user_cart`
-            await deleteDoc(cartDoc.ref); // Use deleteDoc to delete from Firestore
-
-            setCartItems([]);
+            await deleteDoc(cartDoc.ref);
           });
 
-          // Wait for all `user_joined_class` updates and cart deletions to complete
           await Promise.all(joinedClassPromises);
 
-          // Notify the user that the checkout process is complete
           Alert.alert(
             "Checkout Complete",
             "All classes have been joined successfully."
@@ -224,8 +223,8 @@ const CartScreen: React.FC = () => {
             <Text style={styles.sessionText}>Date: {session.classDate}</Text>
             <Text style={styles.sessionText}>Teacher: {session.teacher}</Text>
             <Text style={styles.sessionText}>Time: {formattedTime}</Text>
-            <Text style={styles.sessionComment}>
-              Comment: {session.comment}
+            <Text style={styles.sessionDescription}>
+              Comment: {session.description}
             </Text>
           </View>
         );
@@ -284,7 +283,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textPrimary,
   },
-  sessionComment: {
+  sessionDescription: {
     fontSize: 14,
     color: Colors.textSecondary,
     fontStyle: "italic",

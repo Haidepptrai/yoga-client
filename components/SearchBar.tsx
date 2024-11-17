@@ -14,6 +14,8 @@ import Modal from "react-native-modal";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 import { Colors } from "@/constants/Colors";
+import { YogaCourse } from "@/interface/YogaCourse";
+import { YogaSession } from "@/interface/YogaSession";
 
 interface SearchBarProps {
   onSearchResults?: (results: any) => void; // Adjust type as per actual usage
@@ -59,8 +61,6 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
   const [keyword, setKeyword] = useState("");
   const handleSearch = async () => {
     try {
-      const now = Date.now();
-  
       const coursesRef = collection(db, "yoga_courses");
       const coursesQuery = query(
         coursesRef,
@@ -68,44 +68,54 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
         where("typeOfClass", "<", keyword + "\uf8ff")
       );
       const coursesSnapshot = await getDocs(coursesQuery);
-  
+
       if (coursesSnapshot.empty) {
-        console.warn("No course found for the specified name.");
+        console.warn("No courses found.");
         onSearchResults && onSearchResults([]);
         return;
       }
-  
-      // Filter results by `createdAt`
-      const filteredCourses = coursesSnapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        // .filter((course) => course.createdAt >= now); // Temporary filter
-  
-      if (filteredCourses.length === 0) {
-        console.warn("No upcoming courses found.");
-        onSearchResults && onSearchResults([]);
-        return;
-      }
-  
-      const courseId = filteredCourses[0].id;
-  
+
+      const courses = coursesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as unknown as YogaCourse[];
+
+      const courseIds = courses.map((course) => course.id);
       const sessionsRef = collection(db, "yoga_sessions");
       const sessionsQuery = query(
         sessionsRef,
-        where("courseId", "==", parseInt(courseId))
+        where("courseId", "in", courseIds)
       );
       const sessionsSnapshot = await getDocs(sessionsQuery);
-  
+
+      if (sessionsSnapshot.empty) {
+        console.warn("No sessions found.");
+        onSearchResults && onSearchResults([]);
+        return;
+      }
+
       const sessions = sessionsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }));
-  
-      onSearchResults && onSearchResults(sessions);
+      })) as unknown as YogaSession[];
+
+      // Merge sessions with courses
+      const mergedResults = sessions.map((session) => {
+        const course = courses.find((course) => course.id === session.courseId);
+        return {
+          ...session,
+          timeOfCourse: course?.timeOfCourse || "No Time",
+          duration: course?.duration || null,
+          typeOfClass: course?.typeOfClass || "Unknown Class",
+          description: course?.description || "No description available",
+        };
+      });
+
+      onSearchResults && onSearchResults(mergedResults);
     } catch (error) {
-      console.error("Error fetching sessions:", error);
+      console.error("Error fetching data:", error);
     }
   };
-  
 
   return (
     <>
