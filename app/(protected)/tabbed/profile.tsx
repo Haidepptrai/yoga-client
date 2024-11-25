@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import HeaderWithBackButton from "@/components/navigation/HeaderWithBackButton";
 import { z } from "zod";
 import { Colors } from "@/constants/Colors";
@@ -21,6 +21,7 @@ const profileSchema = z.object({
 export default function ProfileScreen() {
   const [profile, setProfile] = useState({ email: "", name: "", phone: "" });
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false); // State for edit mode
   const router = useRouter();
   const { fromCart } = useLocalSearchParams(); // Check if navigated from Cart
   const auth = getAuth();
@@ -55,6 +56,13 @@ export default function ProfileScreen() {
     fetchProfile();
   }, [user]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const resetEditingMode = () => setIsEditing(false);
+      resetEditingMode();
+    }, [])
+  );
+
   const handleSaveProfile = async () => {
     // Validate form data with Zod
     const result = profileSchema.safeParse({
@@ -84,6 +92,9 @@ export default function ProfileScreen() {
         { merge: true }
       );
       Alert.alert("Success", "Profile updated successfully!");
+
+      // Disable editing mode after saving
+      setIsEditing(false);
 
       // If accessed from Cart, navigate back to Cart after saving
       if (fromCart) {
@@ -136,6 +147,7 @@ export default function ProfileScreen() {
           onChangeText={(text) =>
             setProfile((prev) => ({ ...prev, name: text }))
           }
+          editable={isEditing} // Disable editing if not in edit mode
         />
 
         <Text style={styles.label}>Phone</Text>
@@ -146,13 +158,22 @@ export default function ProfileScreen() {
             setProfile((prev) => ({ ...prev, phone: text }))
           }
           keyboardType="phone-pad"
+          editable={isEditing} // Disable editing if not in edit mode
         />
 
-        <Button
-          title="Save Profile"
-          onPress={handleSaveProfile}
-          color={Colors.primary}
-        />
+        {isEditing ? (
+          <Button
+            title="Save Profile"
+            onPress={handleSaveProfile}
+            color={Colors.primary}
+          />
+        ) : (
+          <Button
+            title="Edit Profile"
+            onPress={() => setIsEditing(true)} // Enable editing mode
+            color={Colors.secondary}
+          />
+        )}
       </View>
     </View>
   );

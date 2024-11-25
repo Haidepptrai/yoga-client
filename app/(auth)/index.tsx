@@ -49,12 +49,10 @@ const LoginScreen: React.FC = () => {
       if (isLogin) {
         // Log in user
         await signInWithEmailAndPassword(auth, email, password);
-        console.log("Logged in successfully");
         router.replace("/(protected)/tabbed");
       } else {
         // Attempt to create a new account
         await createUserWithEmailAndPassword(auth, email, password);
-        console.log("Account created successfully");
         setEmailError(null);
         setSuccessMessage("Account created successfully! Please log in.");
         setIsLogin(true);

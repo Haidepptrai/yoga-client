@@ -1,10 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import {
-  getAuth,
-  setPersistence,
-  browserLocalPersistence,
-} from "firebase/auth";
+import { initializeAuth } from "firebase/auth";
+import { getReactNativePersistence } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -22,16 +20,9 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore
 export const db = getFirestore(app);
 
-// Initialize Auth with browserLocalPersistence
-const auth = getAuth(app);
-
-// Set persistence to browserLocalPersistence
-setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log("Persistence set to local.");
-  })
-  .catch((error) => {
-    console.error("Error setting persistence:", error);
-  });
+// Initialize Auth with AsyncStorage for React Native
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
 export { app, auth };

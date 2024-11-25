@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Colors } from "@/constants/Colors";
 import CustomButton from "./CustomButton";
+import { ThemedText } from "./ThemedText";
 
 interface YogaSessionCardProps {
   typeOfClass: string;
@@ -11,6 +12,7 @@ interface YogaSessionCardProps {
   teacher: string;
   duration: number | null;
   onAddToCart: () => void;
+  isJoined?: boolean;
 }
 
 const YogaSessionCard: React.FC<YogaSessionCardProps> = ({
@@ -20,28 +22,28 @@ const YogaSessionCard: React.FC<YogaSessionCardProps> = ({
   description,
   teacher,
   duration,
+  isJoined = false,
   onAddToCart,
 }) => {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.type}>{typeOfClass || "Unknown Class"}</Text>
-        <Text style={styles.date}>
+        <ThemedText color={Colors.textPrimary}>
+          {typeOfClass || "Unknown Class"}
+        </ThemedText>
+        <ThemedText color={Colors.textSecondary}>
           {classDate || "No Date"} - {timeOfCourse || "No Time"}
-        </Text>
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.description}>
-          {description || "No description available"}
-        </Text>
+        </ThemedText>
       </View>
       <View style={styles.cardFooter}>
-        <Text style={styles.teacher}>{teacher || "Unknown Teacher"}</Text>
-        <Text style={styles.duration}>
+        <ThemedText color={Colors.textPrimary}>
+          {teacher || "Unknown Teacher"}
+        </ThemedText>
+        <ThemedText color={Colors.textPrimary}>
           {duration ? `${duration} mins` : "No Duration"}
-        </Text>
+        </ThemedText>
       </View>
-      <CustomButton label="Add to Cart" onPress={onAddToCart} />
+      {!isJoined && <CustomButton label="Add to Cart" onPress={onAddToCart} />}
     </View>
   );
 };
@@ -66,33 +68,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  type: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-  },
-  date: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  cardBody: {
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  teacher: {
-    fontSize: 14,
-    color: Colors.textAccent,
-    fontStyle: "italic",
-  },
-  duration: {
-    fontSize: 14,
-    color: Colors.textAccent,
   },
 });

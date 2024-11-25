@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import YogaCourseCard from "@/components/YogaCourseCard";
 import { ThemedText } from "@/components/ThemedText";
+import mapDocToYogaCourse from "@/utils/mapToCourse";
 
 const CourseListAvailable = () => {
   const [yogaCourses, setYogaCourses] = useState<YogaCourse[]>([]);
@@ -69,17 +70,7 @@ const CourseListAvailable = () => {
       const querySnapshot = await getDocs(coursesQuery);
 
       if (querySnapshot.docs.length > 0) {
-        const coursesData = querySnapshot.docs.map((doc) => ({
-          id: parseInt(doc.id),
-          dayOfWeek: doc.data().dayOfWeek || "Unknown",
-          timeOfCourse: doc.data().timeOfCourse || "00:00",
-          duration: doc.data().duration || 0,
-          capacity: doc.data().capacity || 0,
-          pricePerClass: doc.data().pricePerClass || 0,
-          typeOfClass: doc.data().typeOfClass || "Unknown",
-          description: doc.data().description || "",
-          isPublished: doc.data().published || false,
-        })) as YogaCourse[];
+        const coursesData = querySnapshot.docs.map(mapDocToYogaCourse);
 
         // Append new data to the existing list without duplicating items
         setYogaCourses((prevCourses) => {
