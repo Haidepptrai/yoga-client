@@ -51,9 +51,9 @@ const YogaCourseCard: React.FC<YogaCourseCardProps> = ({ course, context }) => {
       <View style={styles.header}>
         <Text style={styles.courseType}>{course.typeOfClass}</Text>
         {context === "available" && (
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>
-              {course.isPublished ? "Published" : "Unpublished"}
+          <View>
+            <Text style={styles.timeText}>
+              {course.timeOfCourse} - {formattedEndTime}
             </Text>
           </View>
         )}
@@ -64,9 +64,6 @@ const YogaCourseCard: React.FC<YogaCourseCardProps> = ({ course, context }) => {
         <>
           <View style={styles.infoRow}>
             <Text style={styles.dayText}>{course.dayOfWeek}</Text>
-            <Text style={styles.timeText}>
-              {course.timeOfCourse} - {formattedEndTime}
-            </Text>
           </View>
           <Text style={styles.description}>{course.description}</Text>
           <View style={styles.footer}>
@@ -114,15 +111,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: Colors.primary,
   },
-  statusBadge: {
-    backgroundColor: Colors.secondary,
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  statusText: {
-    color: Colors.white,
-    fontSize: 12,
+  timeText: {
+    color: Colors.textPrimary,
+    fontSize: 16,
   },
   infoRow: {
     flexDirection: "row",
@@ -132,11 +123,6 @@ const styles = StyleSheet.create({
   dayText: {
     fontSize: 14,
     color: Colors.textSecondary,
-  },
-  timeText: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    fontWeight: "600",
   },
   description: {
     marginTop: 12,

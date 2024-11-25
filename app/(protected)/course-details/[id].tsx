@@ -129,13 +129,8 @@ const CourseDetails = () => {
   const fetchAvailableClasses = async (
     startAfterDoc: QueryDocumentSnapshot | null = null
   ) => {
-    if (loadingMoreClasses || !hasMoreClasses) return;
-
-    setLoadingMoreClasses(true);
-
     try {
       const classesRef = collection(db, "yoga_sessions");
-
       // Base query with explicit orderBy and where clause
       let baseQuery = query(
         classesRef,
@@ -143,14 +138,12 @@ const CourseDetails = () => {
         orderBy("classDate", "asc"), // Ensure explicit order by 'classDate'
         limit(pageSize)
       );
-
       // Add pagination if startAfterDoc is valid
       if (startAfterDoc && startAfterDoc instanceof QueryDocumentSnapshot) {
         baseQuery = query(baseQuery, startAfter(startAfterDoc));
       }
 
       const querySnapshot = await getDocs(baseQuery);
-
       if (querySnapshot.docs.length > 0) {
         const classes = querySnapshot.docs.map((doc) => ({
           id: doc.id,
@@ -222,7 +215,11 @@ const CourseDetails = () => {
               <Text style={styles.detailValue}>{course.typeOfClass}</Text>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailLabel}>Duration:</Text>
+              <Text style={styles.detailLabel}>Day available:</Text>
+              <Text style={styles.detailValue}>{course.dayOfWeek}</Text>
+            </View>
+            <View style={styles.detailsRow}>
+              <Text style={styles.detailLabel}>Duration each class:</Text>
               <Text style={styles.detailValue}>{course.duration} mins</Text>
             </View>
             <View style={styles.detailsRow}>
@@ -231,7 +228,7 @@ const CourseDetails = () => {
             </View>
           </View>
           <Text style={styles.learnTitle}>Course Description</Text>
-          <Text style={styles.description}>{course.description}</Text>
+          <Text style={styles.description}>{course.description || "None"}</Text>
           <View style={styles.buttonContainer}>
             {isJoined ? (
               <CustomButton
@@ -251,18 +248,20 @@ const CourseDetails = () => {
           </View>
         </View>
       }
-      data={availableClasses}
+      data={isJoined ? availableClasses : []}
       renderItem={renderClassItem}
       keyExtractor={(item) => item.id.toString()}
       onEndReached={() => {
         fetchAvailableClasses(lastClassDoc);
       }}
       onEndReachedThreshold={0.5}
+      contentContainerStyle={styles.container}
       ListFooterComponent={
         loadingMoreClasses ? (
           <ActivityIndicator size="small" color={Colors.primary} />
         ) : null
       }
+      keyboardShouldPersistTaps="handled" // Ensure taps are registered
     />
   );
 };
@@ -272,7 +271,7 @@ export default CourseDetails;
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.background,
-    padding: 16,
+    paddingBottom: 100,
   },
   title: {
     fontSize: 24,
@@ -329,12 +328,14 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   learnTitle: {
+    paddingHorizontal: 16,
     fontSize: 18,
     fontWeight: "700",
     color: Colors.textPrimary,
     marginBottom: 10,
   },
   description: {
+    paddingHorizontal: 16,
     fontSize: 16,
     color: Colors.textPrimary,
     lineHeight: 22,

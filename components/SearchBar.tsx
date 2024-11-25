@@ -2,18 +2,13 @@ import React, { useState } from "react";
 import {
   View,
   TouchableOpacity,
-  Text,
   StyleSheet,
   TextInput,
+  Text,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
-import Modal from "react-native-modal";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
-import { Colors } from "@/constants/Colors";
 import { YogaCourse } from "@/interface/YogaCourse";
 import { YogaSession } from "@/interface/YogaSession";
 
@@ -21,97 +16,122 @@ interface SearchBarProps {
   onSearchResults?: (results: any) => void; // Adjust type as per actual usage
 }
 
-const formatDate = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const formatTime = (date: Date): string => {
-  const hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
-  const formattedHours = hours % 12 || 12;
-  return `${formattedHours}:${minutes} ${ampm}`;
-};
-
 const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
-  const [isAdvancedSearchVisible, setAdvancedSearchVisible] =
-    useState<boolean>(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<Date>(new Date());
-  const [mode, setMode] = useState<"date" | "time">("date");
-  const [isPickerVisible, setPickerVisible] = useState<boolean>(false);
-
-  const showPicker = (currentMode: "date" | "time") => {
-    setMode(currentMode);
-    setPickerVisible(true);
-  };
-
-  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
-    setPickerVisible(false);
-    if (date) {
-      mode === "date" ? setSelectedDate(date) : setSelectedTime(date);
-    }
-  };
-
-  const openAdvancedSearchModal = () => setAdvancedSearchVisible(true);
-
   const [keyword, setKeyword] = useState("");
+  const [showJoined, setShowJoined] = useState(false); // Toggle for joined classes
+
   const handleSearch = async () => {
     try {
-      const coursesRef = collection(db, "yoga_courses");
-      const coursesQuery = query(
-        coursesRef,
-        where("typeOfClass", ">=", keyword),
-        where("typeOfClass", "<", keyword + "\uf8ff")
-      );
-      const coursesSnapshot = await getDocs(coursesQuery);
+      if (showJoined) {
+        // Fetch user_joined_class
+        const joinedClassesRef = collection(db, "user_joined_class");
+        const joinedSnapshot = await getDocs(joinedClassesRef);
 
-      if (coursesSnapshot.empty) {
-        console.warn("No courses found.");
-        onSearchResults && onSearchResults([]);
-        return;
+        if (joinedSnapshot.empty) {
+          console.warn("No joined classes found.");
+          onSearchResults && onSearchResults([]);
+          return;
+        }
+
+        const joinedClasses = joinedSnapshot.docs.map((doc) => doc.data());
+
+        const sessionIds = joinedClasses.map((joined) => joined.classId);
+        const sessionsRef = collection(db, "yoga_sessions");
+        const sessionsQuery = query(sessionsRef, where("id", "in", sessionIds));
+        const sessionsSnapshot = await getDocs(sessionsQuery);
+
+        if (sessionsSnapshot.empty) {
+          console.warn("No sessions found.");
+          onSearchResults && onSearchResults([]);
+          return;
+        }
+
+        const sessions = sessionsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as unknown as YogaSession[];
+
+        const courseIds = sessions.map((session) => session.courseId);
+        const coursesRef = collection(db, "yoga_courses");
+        const coursesQuery = query(coursesRef, where("id", "in", courseIds));
+        const coursesSnapshot = await getDocs(coursesQuery);
+
+        const courses = coursesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as unknown as YogaCourse[];
+
+        // Merge sessions with courses
+        const mergedResults = sessions.map((session) => {
+          const course = courses.find(
+            (course) => course.id === session.courseId
+          );
+          return {
+            ...session,
+            timeOfCourse: course?.timeOfCourse || "No Time",
+            duration: course?.duration || null,
+            typeOfClass: course?.typeOfClass || "Unknown Class",
+            description: course?.description || "No description available",
+          };
+        });
+
+        onSearchResults && onSearchResults(mergedResults);
+      } else {
+        // Fetch regular courses based on search keyword
+        const coursesRef = collection(db, "yoga_courses");
+        const coursesQuery = query(
+          coursesRef,
+          where("typeOfClass", ">=", keyword),
+          where("typeOfClass", "<", keyword + "\uf8ff")
+        );
+        const coursesSnapshot = await getDocs(coursesQuery);
+
+        if (coursesSnapshot.empty) {
+          console.warn("No courses found.");
+          onSearchResults && onSearchResults([]);
+          return;
+        }
+
+        const courses = coursesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as unknown as YogaCourse[];
+
+        const courseIds = courses.map((course) => course.id);
+        const sessionsRef = collection(db, "yoga_sessions");
+        const sessionsQuery = query(
+          sessionsRef,
+          where("courseId", "in", courseIds)
+        );
+        const sessionsSnapshot = await getDocs(sessionsQuery);
+
+        if (sessionsSnapshot.empty) {
+          console.warn("No sessions found.");
+          onSearchResults && onSearchResults([]);
+          return;
+        }
+
+        const sessions = sessionsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as unknown as YogaSession[];
+
+        // Merge sessions with courses
+        const mergedResults = sessions.map((session) => {
+          const course = courses.find(
+            (course) => course.id === session.courseId
+          );
+          return {
+            ...session,
+            timeOfCourse: course?.timeOfCourse || "No Time",
+            duration: course?.duration || null,
+            typeOfClass: course?.typeOfClass || "Unknown Class",
+            description: course?.description || "No description available",
+          };
+        });
+
+        onSearchResults && onSearchResults(mergedResults);
       }
-
-      const courses = coursesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as unknown as YogaCourse[];
-
-      const courseIds = courses.map((course) => course.id);
-      const sessionsRef = collection(db, "yoga_sessions");
-      const sessionsQuery = query(
-        sessionsRef,
-        where("courseId", "in", courseIds)
-      );
-      const sessionsSnapshot = await getDocs(sessionsQuery);
-
-      if (sessionsSnapshot.empty) {
-        console.warn("No sessions found.");
-        onSearchResults && onSearchResults([]);
-        return;
-      }
-
-      const sessions = sessionsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as unknown as YogaSession[];
-
-      // Merge sessions with courses
-      const mergedResults = sessions.map((session) => {
-        const course = courses.find((course) => course.id === session.courseId);
-        return {
-          ...session,
-          timeOfCourse: course?.timeOfCourse || "No Time",
-          duration: course?.duration || null,
-          typeOfClass: course?.typeOfClass || "Unknown Class",
-          description: course?.description || "No description available",
-        };
-      });
-
-      onSearchResults && onSearchResults(mergedResults);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -123,67 +143,32 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Type course type..."
+            placeholder={
+              showJoined
+                ? "Click search button to show joined course..."
+                : "Type course type..."
+            }
             value={keyword}
             onChangeText={(text) => setKeyword(text)}
+            editable={!showJoined} // Disable input when viewing joined classes
           />
           <TouchableOpacity style={styles.iconContainer} onPress={handleSearch}>
             <FontAwesome name="search" size={20} color="#888" />
           </TouchableOpacity>
         </View>
-        {/* Advanced Search Button */}
         <TouchableOpacity
-          onPress={openAdvancedSearchModal}
-          style={styles.advancedButton}
+          style={styles.toggleButton}
+          onPress={() => {
+            setShowJoined((prev) => !prev);
+            setKeyword("");
+            onSearchResults && onSearchResults([])
+          }}
         >
-          <Text style={styles.advancedButtonText}>Advanced search</Text>
+          <Text style={styles.toggleText}>
+            {showJoined ? "Show All Classes" : "Show Joined Classes"}
+          </Text>
         </TouchableOpacity>
       </View>
-
-      {/* Advanced Search Modal */}
-      <Modal
-        isVisible={isAdvancedSearchVisible}
-        onBackdropPress={() => setAdvancedSearchVisible(false)}
-        style={styles.modal}
-      >
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Date & Time</Text>
-
-          {/* Date Picker */}
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => showPicker("date")}
-          >
-            <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
-          </TouchableOpacity>
-
-          {/* Time Picker */}
-          <TouchableOpacity
-            style={styles.timeInput}
-            onPress={() => showPicker("time")}
-          >
-            <Text style={styles.dateText}>{formatTime(selectedTime)}</Text>
-          </TouchableOpacity>
-
-          {/* Date & Time Picker rendered outside of the modal */}
-          {isPickerVisible && (
-            <DateTimePicker
-              value={mode === "date" ? selectedDate : selectedTime}
-              mode={mode}
-              display="spinner"
-              onChange={handleDateChange}
-            />
-          )}
-
-          {/* Confirm Button */}
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={() => setAdvancedSearchVisible(false)}
-          >
-            <Text style={styles.confirmButtonText}>Set date & time</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
     </>
   );
 };
@@ -210,65 +195,13 @@ const styles = StyleSheet.create({
   iconContainer: {
     paddingLeft: 10,
   },
-  advancedButton: {
-    flexDirection: "row",
-    alignItems: "center",
+  toggleButton: {
     marginTop: 10,
-    color: Colors.primary,
-    justifyContent: "flex-end",
+    alignSelf: "center",
   },
-  advancedButtonText: {
+  toggleText: {
+    color: "#007BFF",
     fontSize: 16,
-    color: "#555",
-    marginRight: 5,
-  },
-  modal: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#FFF",
-    borderRadius: 8,
-    padding: 20,
-    width: "80%",
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
-  dateInput: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: "#EEE",
-    borderRadius: 8,
-    marginBottom: 15,
-    width: "100%",
-    alignItems: "center",
-  },
-  timeInput: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: "#EEE",
-    borderRadius: 8,
-    marginBottom: 20,
-    width: "100%",
-    alignItems: "center",
-  },
-  dateText: {
-    fontSize: 16,
-    color: "#555",
-  },
-  confirmButton: {
-    backgroundColor: "#4CAF50",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-  },
-  confirmButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
 });

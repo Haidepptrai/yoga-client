@@ -75,13 +75,17 @@ export default function UserCourseList() {
         <ThemedText type="title">Your Courses</ThemedText>
         <ThemedText type="link">View all</ThemedText>
       </View>
-      <FlatList
-        data={yogaClasses}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      />
+      {yogaClasses.length > 0 ? (
+        <FlatList
+          data={yogaClasses}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        />
+      ) : (
+        <ThemedText>You have not joined any courses yet.</ThemedText>
+      )}
     </View>
   );
 }
