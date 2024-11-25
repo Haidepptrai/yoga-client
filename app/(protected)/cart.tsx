@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { Colors } from "@/constants/Colors";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { YogaSession } from "@/interface/YogaSession";
 
 interface CourseDetails {
@@ -40,84 +40,83 @@ const CartScreen: React.FC = () => {
   const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchCartItems = async () => {
-      if (!user) {
-        Alert.alert("Error", "You must be logged in to view the cart.");
-        return;
-      }
+  useFocusEffect(
+    useCallback(() => {
+      fetchCartItems();
+    }, [user])
+  );
 
-      try {
-        setLoading(true);
+  const fetchCartItems = async () => {
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to view the cart.");
+      return;
+    }
 
-        // Step 1: Get the user's cart items from `user_cart`
-        const cartRef = collection(db, "user_cart");
-        const cartQuery = query(cartRef, where("userId", "==", user.uid));
-        const cartSnapshot = await getDocs(cartQuery);
+    try {
+      setLoading(true);
 
-        // Collect class IDs from the user's cart (always as numbers)
-        const classIds = cartSnapshot.docs.map(
-          (doc) => doc.data().classId as number
-        );
+      // Step 1: Get the user's cart items from `user_cart`
+      const cartRef = collection(db, "user_cart");
+      const cartQuery = query(cartRef, where("userId", "==", user.uid));
+      const cartSnapshot = await getDocs(cartQuery);
 
-        console.log("Fetched classIds:", classIds);
+      // Collect class IDs from the user's cart (always as numbers)
+      const classIds = cartSnapshot.docs.map(
+        (doc) => doc.data().classId as number
+      );
+      // Step 2: Fetch the class details from `yoga_sessions` using the class IDs
+      const sessionPromises = classIds.map(async (classId) => {
+        const sessionRef = doc(db, "yoga_sessions", String(classId)); // Convert to string for Firestore
+        const sessionSnap = await getDoc(sessionRef);
 
-        // Step 2: Fetch the class details from `yoga_sessions` using the class IDs
-        const sessionPromises = classIds.map(async (classId) => {
-          const sessionRef = doc(db, "yoga_sessions", String(classId)); // Convert to string for Firestore
-          const sessionSnap = await getDoc(sessionRef);
+        if (sessionSnap.exists()) {
+          return {
+            id: sessionSnap.id,
+            ...sessionSnap.data(),
+          } as unknown as YogaSession;
+        }
+        return null;
+      });
 
-          if (sessionSnap.exists()) {
-            return {
-              id: sessionSnap.id,
-              ...sessionSnap.data(),
-            } as unknown as YogaSession;
-          }
-          return null;
-        });
+      // Step 3: Fetch course details for each class
+      const sessions = (await Promise.all(sessionPromises)).filter(
+        (session) => session !== null
+      ) as YogaSession[];
+      const courseIds = Array.from(
+        new Set(sessions.map((s) => s.courseId.toString()))
+      );
+      const courseDetailsPromises = courseIds.map(async (courseId) => {
+        const courseRef = doc(db, "yoga_courses", courseId);
+        const courseSnap = await getDoc(courseRef);
 
-        // Step 3: Fetch course details for each class
-        const sessions = (await Promise.all(sessionPromises)).filter(
-          (session) => session !== null
-        ) as YogaSession[];
-        const courseIds = Array.from(
-          new Set(sessions.map((s) => s.courseId.toString()))
-        );
-        const courseDetailsPromises = courseIds.map(async (courseId) => {
-          const courseRef = doc(db, "yoga_courses", courseId);
-          const courseSnap = await getDoc(courseRef);
+        if (courseSnap.exists()) {
+          return {
+            id: courseId,
+            ...courseSnap.data(),
+          } as unknown as CourseDetails;
+        }
+        return null;
+      });
 
-          if (courseSnap.exists()) {
-            return {
-              id: courseId,
-              ...courseSnap.data(),
-            } as unknown as CourseDetails;
-          }
-          return null;
-        });
+      const fetchedCourseDetails = (
+        await Promise.all(courseDetailsPromises)
+      ).filter((course) => course !== null) as CourseDetails[];
 
-        const fetchedCourseDetails = (
-          await Promise.all(courseDetailsPromises)
-        ).filter((course) => course !== null) as CourseDetails[];
+      // Map course details by courseId for easy access
+      const courseDetailsMap = fetchedCourseDetails.reduce((acc, course) => {
+        acc[course.id] = course;
+        return acc;
+      }, {} as { [key: string]: CourseDetails });
 
-        // Map course details by courseId for easy access
-        const courseDetailsMap = fetchedCourseDetails.reduce((acc, course) => {
-          acc[course.id] = course;
-          return acc;
-        }, {} as { [key: string]: CourseDetails });
-
-        setCourseDetails(courseDetailsMap);
-        setCartItems(sessions);
-      } catch (error) {
-        console.error("Error fetching cart items:", error);
-        Alert.alert("Error", "Could not load cart items. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCartItems();
-  }, [user]);
+      setCourseDetails(courseDetailsMap);
+      setCartItems(sessions);
+    } catch (error) {
+      console.error("Error fetching cart items:", error);
+      Alert.alert("Error", "Could not load cart items. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatTime = (date: Date) => date.toTimeString().slice(0, 5); // Formats as HH:MM
 
@@ -144,7 +143,6 @@ const CartScreen: React.FC = () => {
           );
           router.navigate("/(protected)/tabbed/profile"); // Navigate to profile screen to update information
         } else {
-          Alert.alert("Success", "Proceeding to checkout...");
 
           // Retrieve and delete all classes from `user_cart`
           const cartRef = collection(db, "user_cart");
@@ -177,6 +175,9 @@ const CartScreen: React.FC = () => {
             "Checkout Complete",
             "All classes have been joined successfully."
           );
+
+          // Refresh cart items after successful checkout
+          fetchCartItems(); // Re-fetch cart items to reflect the changes
         }
       } else {
         Alert.alert("Error", "User profile not found.");

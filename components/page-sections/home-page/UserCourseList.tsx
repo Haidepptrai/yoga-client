@@ -71,9 +71,8 @@ export default function UserCourseList() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View>
         <ThemedText type="title">Your Courses</ThemedText>
-        <ThemedText type="link">View all</ThemedText>
       </View>
       {yogaClasses.length > 0 ? (
         <FlatList
@@ -81,6 +80,7 @@ export default function UserCourseList() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           horizontal
+          contentContainerStyle={{ paddingHorizontal: 8 }}
           showsHorizontalScrollIndicator={false}
         />
       ) : (
@@ -93,10 +93,6 @@ export default function UserCourseList() {
 const styles = StyleSheet.create({
   container: {
     gap: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
   viewAll: {
     fontSize: 14,

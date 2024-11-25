@@ -13,7 +13,7 @@ import { YogaCourse } from "@/interface/YogaCourse";
 import { YogaSession } from "@/interface/YogaSession";
 
 interface SearchBarProps {
-  onSearchResults?: (results: any) => void; // Adjust type as per actual usage
+  onSearchResults?: (joined: boolean, results: YogaSession[]) => void; // Adjust type as per actual usage
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
@@ -29,7 +29,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
 
         if (joinedSnapshot.empty) {
           console.warn("No joined classes found.");
-          onSearchResults && onSearchResults([]);
+          onSearchResults && onSearchResults(true, []);
           return;
         }
 
@@ -42,7 +42,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
 
         if (sessionsSnapshot.empty) {
           console.warn("No sessions found.");
-          onSearchResults && onSearchResults([]);
+          onSearchResults && onSearchResults(true, []);
           return;
         }
 
@@ -69,13 +69,13 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
           return {
             ...session,
             timeOfCourse: course?.timeOfCourse || "No Time",
-            duration: course?.duration || null,
+            duration: course?.duration || 0,
             typeOfClass: course?.typeOfClass || "Unknown Class",
             description: course?.description || "No description available",
           };
         });
 
-        onSearchResults && onSearchResults(mergedResults);
+        onSearchResults && onSearchResults(true, mergedResults);
       } else {
         // Fetch regular courses based on search keyword
         const coursesRef = collection(db, "yoga_courses");
@@ -88,7 +88,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
 
         if (coursesSnapshot.empty) {
           console.warn("No courses found.");
-          onSearchResults && onSearchResults([]);
+          onSearchResults && onSearchResults(false, []);
           return;
         }
 
@@ -107,7 +107,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
 
         if (sessionsSnapshot.empty) {
           console.warn("No sessions found.");
-          onSearchResults && onSearchResults([]);
+          onSearchResults && onSearchResults(false, []);
           return;
         }
 
@@ -124,13 +124,13 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
           return {
             ...session,
             timeOfCourse: course?.timeOfCourse || "No Time",
-            duration: course?.duration || null,
+            duration: course?.duration || 0,
             typeOfClass: course?.typeOfClass || "Unknown Class",
             description: course?.description || "No description available",
           };
         });
 
-        onSearchResults && onSearchResults(mergedResults);
+        onSearchResults && onSearchResults(false, mergedResults);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -161,7 +161,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
           onPress={() => {
             setShowJoined((prev) => !prev);
             setKeyword("");
-            onSearchResults && onSearchResults([])
+            onSearchResults && onSearchResults(showJoined, []);
           }}
         >
           <Text style={styles.toggleText}>

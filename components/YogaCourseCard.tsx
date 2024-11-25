@@ -2,19 +2,8 @@ import { Colors } from "@/constants/Colors";
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-
-export interface YogaCourse {
-  id: number;
-  dayOfWeek?: string;
-  timeOfCourse?: string;
-  duration?: number;
-  capacity?: number;
-  pricePerClass?: number;
-  typeOfClass: string;
-  description?: string;
-  isPublished?: boolean;
-  joinedAt?: string; // For joined courses
-}
+import { ThemedText } from "./ThemedText";
+import { YogaCourse } from "@/interface/YogaCourse";
 
 interface YogaCourseCardProps {
   course: YogaCourse;
@@ -50,40 +39,36 @@ const YogaCourseCard: React.FC<YogaCourseCardProps> = ({ course, context }) => {
       {/* Header Section */}
       <View style={styles.header}>
         <Text style={styles.courseType}>{course.typeOfClass}</Text>
-        {context === "available" && (
-          <View>
-            <Text style={styles.timeText}>
-              {course.timeOfCourse} - {formattedEndTime}
-            </Text>
-          </View>
-        )}
+        <View>
+          <Text style={styles.timeText}>
+            {course.timeOfCourse} - {formattedEndTime}
+          </Text>
+        </View>
       </View>
 
       {/* Conditional Rendering Based on Context */}
+
+      <View style={styles.infoRow}>
+        <ThemedText style={styles.dayText}>
+          Occur on: {course.dayOfWeek}
+        </ThemedText>
+      </View>
       {context === "available" && (
-        <>
-          <View style={styles.infoRow}>
-            <Text style={styles.dayText}>{course.dayOfWeek}</Text>
-          </View>
-          <Text style={styles.description}>{course.description}</Text>
-          <View style={styles.footer}>
-            <Text style={styles.priceText}>
-              ${course.pricePerClass} per class
-            </Text>
-            <Text style={styles.capacityText}>
-              {course.capacity} spots available
-            </Text>
-          </View>
-        </>
+        <View style={styles.footer}>
+          <Text style={styles.priceText}>${course.price} for whole course</Text>
+          <Text style={styles.capacityText}>
+            {course.capacity} spots available
+          </Text>
+        </View>
       )}
 
-      {context === "joined" && (
+      {/* {context === "joined" && (
         <>
           <Text style={styles.joinedAtText}>
             Joined on: {new Date(course.joinedAt || "").toLocaleDateString()}
           </Text>
         </>
-      )}
+      )} */}
     </Pressable>
   );
 };
@@ -105,6 +90,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
+    gap: 32,
   },
   courseType: {
     fontSize: 18,
@@ -121,7 +107,6 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   dayText: {
-    fontSize: 14,
     color: Colors.textSecondary,
   },
   description: {

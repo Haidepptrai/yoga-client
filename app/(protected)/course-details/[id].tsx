@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -29,28 +29,13 @@ import { YogaSession } from "@/interface/YogaSession";
 import YogaSessionCard from "@/components/YogaSessionCard";
 import { addToCart } from "@/utils/addToCart";
 import CustomButton from "@/components/CustomButton";
-
-interface YogaCourseDetails {
-  id: number;
-  title: string;
-  category?: string;
-  color?: string;
-  description: string;
-  capacity: number;
-  dayOfWeek: string;
-  duration: number;
-  pricePerClass: number;
-  published: boolean;
-  timeOfCourse: string;
-  typeOfClass: string;
-  createdAt: number;
-  updatedAt: number;
-}
+import { YogaCourse } from "@/interface/YogaCourse";
+import { ThemedText } from "@/components/ThemedText";
 
 const CourseDetails = () => {
   const route = useRoute<RouteProp<{ params: { id: string } }, "params">>();
   const { id } = route.params;
-  const [course, setCourse] = useState<YogaCourseDetails | null>(null);
+  const [course, setCourse] = useState<YogaCourse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isJoined, setIsJoined] = useState<boolean>(false);
   const [availableClasses, setAvailableClasses] = useState<YogaSession[]>([]);
@@ -60,6 +45,7 @@ const CourseDetails = () => {
   const [hasMoreClasses, setHasMoreClasses] = useState<boolean>(true);
   const { user } = useAuth();
   const pageSize = 5;
+  const firstLoad = useRef(false);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -68,7 +54,7 @@ const CourseDetails = () => {
         const courseSnap = await getDoc(courseRef);
 
         if (courseSnap.exists()) {
-          setCourse(courseSnap.data() as YogaCourseDetails);
+          setCourse(courseSnap.data() as YogaCourse);
         } else {
           console.error("Course not found.");
         }
@@ -130,6 +116,10 @@ const CourseDetails = () => {
     startAfterDoc: QueryDocumentSnapshot | null = null
   ) => {
     try {
+      if (!hasMoreClasses || !firstLoad.current) {
+        return; // Exit if there are no more classes
+      }
+
       const classesRef = collection(db, "yoga_sessions");
       // Base query with explicit orderBy and where clause
       let baseQuery = query(
@@ -210,30 +200,50 @@ const CourseDetails = () => {
           <HeaderWithBackButton title="Course Details" />
           <View style={styles.aboutCard}>
             <Text style={styles.sectionTitle}>Course About</Text>
+            <ThemedText type="title" color={Colors.primary}>
+              Course About
+            </ThemedText>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailLabel}>Course name:</Text>
-              <Text style={styles.detailValue}>{course.typeOfClass}</Text>
+              <ThemedText color={Colors.textSecondary}>Course name:</ThemedText>
+              <ThemedText style={styles.detailValue}>
+                {course.typeOfClass}
+              </ThemedText>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailLabel}>Day available:</Text>
-              <Text style={styles.detailValue}>{course.dayOfWeek}</Text>
+              <ThemedText color={Colors.textSecondary}>
+                Day available:
+              </ThemedText>
+              <ThemedText style={styles.detailValue}>
+                {course.dayOfWeek}
+              </ThemedText>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailLabel}>Duration each class:</Text>
-              <Text style={styles.detailValue}>{course.duration} mins</Text>
+              <ThemedText color={Colors.textSecondary}>
+                Duration each class:
+              </ThemedText>
+              <ThemedText style={styles.detailValue}>
+                {course.duration} mins
+              </ThemedText>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailLabel}>Course Fee:</Text>
-              <Text style={styles.detailValue}>${course.pricePerClass}</Text>
+              <ThemedText color={Colors.textSecondary}>Course Fee:</ThemedText>
+              <ThemedText style={styles.detailValue}>
+                ${course.price}
+              </ThemedText>
             </View>
           </View>
-          <Text style={styles.learnTitle}>Course Description</Text>
-          <Text style={styles.description}>{course.description || "None"}</Text>
+          <ThemedText style={styles.learnTitle}>Course Description</ThemedText>
+          <ThemedText style={styles.description}>
+            {course.description || "None"}
+          </ThemedText>
           <View style={styles.buttonContainer}>
             {isJoined ? (
               <CustomButton
                 label="Checkout Available Classes This Week"
-                onPress={fetchAvailableClasses}
+                onPress={() => {
+                  firstLoad.current = true;
+                  fetchAvailableClasses();
+                }}
                 style={styles.checkoutButton}
                 textColor="#FFF"
               />
@@ -252,6 +262,9 @@ const CourseDetails = () => {
       renderItem={renderClassItem}
       keyExtractor={(item) => item.id.toString()}
       onEndReached={() => {
+        if (!firstLoad.current) {
+          return; // Skip first load
+        }
         fetchAvailableClasses(lastClassDoc);
       }}
       onEndReachedThreshold={0.5}
@@ -299,10 +312,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 4,
-  },
-  detailLabel: {
-    fontSize: 16,
-    color: Colors.textSecondary,
   },
   detailValue: {
     fontSize: 16,

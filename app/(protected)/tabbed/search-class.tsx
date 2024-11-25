@@ -9,7 +9,13 @@ import { addToCart } from "@/utils/addToCart";
 
 const SearchScreen = () => {
   const [results, setResults] = useState<YogaSession[]>([]);
+  const [isJoined, setIsJoined] = useState(false);
   const { user } = useAuth();
+
+  const handleClickButton = (joined: boolean, results: YogaSession[]) => {
+    setIsJoined(joined);
+    setResults(results);
+  };
 
   const handleAddToCart = (classId: number) => {
     if (user) {
@@ -19,7 +25,7 @@ const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
-      <SearchBar onSearchResults={setResults} />
+      <SearchBar onSearchResults={handleClickButton} />
       <FlatList
         data={results}
         keyExtractor={(item) => item.id.toString()}
@@ -32,6 +38,7 @@ const SearchScreen = () => {
             teacher={item.teacher}
             duration={item.duration}
             onAddToCart={() => handleAddToCart(item.id)}
+            isJoined={isJoined}
           />
         )}
         ListEmptyComponent={
