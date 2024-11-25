@@ -114,10 +114,12 @@ export default function ProfileScreen() {
 
   return (
     <View>
-      <HeaderWithBackButton
-        title="Edit Profile"
-        onBackPress={handleBackPress}
-      />
+      {fromCart && (
+        <HeaderWithBackButton
+          title="Edit Profile"
+          onBackPress={handleBackPress}
+        />
+      )}
       <View style={styles.container}>
         <ThemedText type="title">User Profile</ThemedText>
         <Text style={styles.label}>Email (non-editable)</Text>
