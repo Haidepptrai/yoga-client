@@ -14,7 +14,7 @@ const HomePageScreen = () => {
       renderItem={null} // No need to render items directly
       keyExtractor={(_, index) => index.toString()} // Provide a key
       ListHeaderComponent={
-        <View style={styles.headerContent}>
+        <View style={styles.headerContainer}>
           <HeroHeader userName={user?.email ?? "User"} />
           <UserCourseList />
         </View>
@@ -31,12 +31,14 @@ const HomePageScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
     gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 200,
   },
-  headerContent: {
-    marginBottom: 16,
-  },
+  headerContainer:{
+    rowGap: 16,
+  }
 });
 
 export default HomePageScreen;

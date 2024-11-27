@@ -60,6 +60,11 @@ const LoginScreen: React.FC = () => {
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         setEmailError("This email is already registered.");
+      } else if (error.code === "auth/invalid-credential") {
+        console.log(error)
+        setEmailError(
+          "Invalid credentials provided. Please check your information and try again."
+        );
       } else {
         console.error("Sign up error:", error);
         setEmailError("An error occurred. Please try again.");

@@ -180,7 +180,7 @@ const CartScreen: React.FC = () => {
           fetchCartItems(); // Re-fetch cart items to reflect the changes
         }
       } else {
-        Alert.alert("Error", "User profile not found.");
+        Alert.alert("Missing information", "You need to fill information before checkout.");
         router.navigate("/(protected)/tabbed/profile");
       }
     } catch (error) {

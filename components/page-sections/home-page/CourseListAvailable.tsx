@@ -1,10 +1,14 @@
-import { YogaCourse } from "@/interface/YogaCourse";
 import React, { useEffect, useState } from "react";
-import { View, FlatList, StyleSheet, Dimensions } from "react-native";
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { db } from "@/firebaseConfig";
 import {
   collection,
-  getDocs,
   query,
   where,
   limit,
@@ -12,10 +16,13 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   orderBy,
+  onSnapshot,
+  getDocs,
 } from "firebase/firestore";
 import YogaCourseCard from "@/components/YogaCourseCard";
 import { ThemedText } from "@/components/ThemedText";
 import mapDocToYogaCourse from "@/utils/mapToCourse";
+import { YogaCourse } from "@/interface/YogaCourse";
 
 const CourseListAvailable = () => {
   const [yogaCourses, setYogaCourses] = useState<YogaCourse[]>([]);
@@ -23,10 +30,10 @@ const CourseListAvailable = () => {
     Dimensions.get("window").height
   );
   const [lastDocument, setLastDocument] =
-    useState<QueryDocumentSnapshot<DocumentData> | null>(null); // Track the last fetched document with proper type
-  const [hasMore, setHasMore] = useState(true); // Track if there are more courses to load
-  const [loading, setLoading] = useState(false); // Track loading state to prevent duplicate calls
-  const pageSize = 5; // Number of courses to load per page
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pageSize = 5;
 
   useEffect(() => {
     const updateScreenHeight = () => {
@@ -38,68 +45,80 @@ const CourseListAvailable = () => {
       updateScreenHeight
     );
 
-    // Initial fetch of yoga courses
-    fetchYogaCourses();
+    // Listen for real-time updates
+    const unsubscribe = listenForYogaCourses();
 
-    // Clean up event listener
+    // Clean up listeners
     return () => {
       subscription.remove();
+      unsubscribe();
     };
   }, []);
 
-  const fetchYogaCourses = async (
-    startAfterDoc: QueryDocumentSnapshot<DocumentData> | null = null
-  ) => {
-    if (loading || !hasMore) return; // Prevent multiple calls when loading or no more data
+  const listenForYogaCourses = () => {
     setLoading(true);
+    setError(null);
+
+    const coursesQuery = query(
+      collection(db, "yoga_courses"),
+      where("published", "==", true),
+      where("deletedAt", "==", null),
+      orderBy("createdAt"),
+      limit(pageSize)
+    );
+
+    return onSnapshot(
+      coursesQuery,
+      (snapshot) => {
+        const coursesData = snapshot.docs.map(mapDocToYogaCourse);
+
+        setYogaCourses(coursesData);
+
+        if (snapshot.docs.length > 0) {
+          setLastDocument(snapshot.docs[snapshot.docs.length - 1]);
+        } else {
+          setLastDocument(null);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error listening for yoga courses:", error);
+        setError("Failed to listen for updates. Please try again later.");
+        setLoading(false);
+      }
+    );
+  };
+
+  const fetchMoreCourses = async () => {
+    if (loading || !lastDocument) return;
+    setLoading(true);
+    setError(null);
 
     try {
-      // Construct query with pagination
-      let coursesQuery = query(
+      const coursesQuery = query(
         collection(db, "yoga_courses"),
         where("published", "==", true),
         where("deletedAt", "==", null),
         orderBy("createdAt"),
+        startAfter(lastDocument),
         limit(pageSize)
       );
 
-      if (startAfterDoc) {
-        coursesQuery = query(coursesQuery, startAfter(startAfterDoc));
-      }
-
       const querySnapshot = await getDocs(coursesQuery);
 
+      const newCourses = querySnapshot.docs.map(mapDocToYogaCourse);
+      setYogaCourses((prevCourses) => [...prevCourses, ...newCourses]);
+
       if (querySnapshot.docs.length > 0) {
-        const coursesData = querySnapshot.docs.map(mapDocToYogaCourse);
-
-        // Append new data to the existing list without duplicating items
-        setYogaCourses((prevCourses) => {
-          const newCourses = coursesData.filter(
-            (newCourse) =>
-              !prevCourses.some((prevCourse) => prevCourse.id === newCourse.id)
-          );
-          return [...prevCourses, ...newCourses];
-        });
-
         setLastDocument(querySnapshot.docs[querySnapshot.docs.length - 1]);
-
-        // If fewer than pageSize documents were fetched, we've reached the end
-        if (querySnapshot.docs.length < pageSize) {
-          setHasMore(false);
-        }
       } else {
-        setHasMore(false); // No more documents
+        setLastDocument(null);
       }
-    } catch (error) {
-      console.error("Error fetching yoga courses:", error);
+    } catch (fetchError) {
+      console.error("Error fetching more courses:", fetchError);
+      setError("Failed to load more courses. Please try again later.");
     } finally {
-      setLoading(false); // Reset loading state
-    }
-  };
-
-  const handleLoadMore = () => {
-    if (hasMore && !loading) {
-      fetchYogaCourses(lastDocument);
+      setLoading(false);
     }
   };
 
@@ -112,21 +131,43 @@ const CourseListAvailable = () => {
     listContent: {
       paddingBottom: 20,
     },
+    errorText: {
+      color: "red",
+      textAlign: "center",
+      marginVertical: 10,
+    },
+    loaderContainer: {
+      paddingVertical: 16,
+    },
   });
 
   return (
     <View style={styles.container}>
       <ThemedText type="title">Available Courses</ThemedText>
-      <FlatList
-        data={yogaCourses}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <YogaCourseCard course={item} context={"available"} />
-        )}
-        contentContainerStyle={styles.listContent}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-      />
+
+      {error ? (
+        <ThemedText style={styles.errorText}>{error}</ThemedText>
+      ) : yogaCourses.length === 0 && !loading ? (
+        <ThemedText>No courses are currently available.</ThemedText>
+      ) : (
+        <FlatList
+          data={yogaCourses}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <YogaCourseCard course={item} context={"available"} />
+          )}
+          contentContainerStyle={styles.listContent}
+          onEndReached={fetchMoreCourses}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#888" />
+              </View>
+            ) : null
+          }
+        />
+      )}
     </View>
   );
 };

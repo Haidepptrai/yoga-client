@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { View, FlatList, StyleSheet } from "react-native";
+import { View, FlatList, StyleSheet, ActivityIndicator } from "react-native";
 import YogaCourseCard from "../../YogaCourseCard";
 import { YogaCourse } from "@/interface/YogaCourse";
 import { ThemedText } from "../../ThemedText";
 import {
   collection,
-  getDocs,
   query,
   where,
   doc,
+  onSnapshot,
   getDoc,
 } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
@@ -16,53 +16,69 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function UserCourseList() {
   const [yogaClasses, setYogaClasses] = useState<YogaCourse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user) {
-        console.error("User is not logged in.");
-        return;
-      }
+    if (!user) {
+      setError("User is not logged in.");
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        // Step 1: Get the user's joined courses from `user_joined_course`
-        const joinedCoursesRef = collection(db, "user_joined_course");
-        const joinedCoursesQuery = query(
-          joinedCoursesRef,
-          where("userId", "==", user.uid)
-        );
-        const joinedCoursesSnapshot = await getDocs(joinedCoursesQuery);
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, "user_joined_course"),
+        where("userId", "==", user.uid)
+      ),
+      async (snapshot) => {
+        setIsLoading(true);
+        setError(null);
 
-        const courseIds = joinedCoursesSnapshot.docs.map(
-          (doc) => doc.data().courseId
-        );
+        try {
+          const courseIds = snapshot.docs.map((doc) => doc.data().courseId);
 
-        // Step 2: Fetch details for each course from `yoga_courses`
-        const courseDetailsPromises = courseIds.map(async (courseId) => {
-          const courseRef = doc(db, "yoga_courses", courseId.toString());
-          const courseSnap = await getDoc(courseRef);
-
-          if (courseSnap.exists()) {
-            return {
-              ...(courseSnap.data() as YogaCourse),
-              id: courseId,
-            };
+          if (courseIds.length === 0) {
+            setYogaClasses([]);
+            setIsLoading(false);
+            return;
           }
-          return null;
-        });
 
-        const courses = (await Promise.all(courseDetailsPromises)).filter(
-          (course) => course !== null
-        ) as YogaCourse[];
+          // Fetch details for each course from `yoga_courses`
+          const courseDetailsPromises = courseIds.map(async (courseId) => {
+            const courseRef = doc(db, "yoga_courses", courseId.toString());
+            const courseSnap = await getDoc(courseRef);
 
-        setYogaClasses(courses);
-      } catch (error) {
-        console.error("Error fetching joined courses:", error);
+            if (courseSnap.exists()) {
+              return {
+                ...(courseSnap.data() as YogaCourse),
+                id: courseId,
+              };
+            }
+            return null;
+          });
+
+          const courses = (await Promise.all(courseDetailsPromises)).filter(
+            (course) => course !== null
+          ) as YogaCourse[];
+
+          setYogaClasses(courses);
+        } catch (fetchError) {
+          console.error("Error fetching joined courses:", fetchError);
+          setError("Failed to load your courses. Please try again.");
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error listening to joined courses:", error);
+        setError("Failed to listen for updates. Please try again.");
+        setIsLoading(false);
       }
-    };
+    );
 
-    fetchData();
+    return () => unsubscribe();
   }, [user]);
 
   const renderItem = ({ item }: { item: YogaCourse }) => (
@@ -74,13 +90,17 @@ export default function UserCourseList() {
       <View>
         <ThemedText type="title">Your Courses</ThemedText>
       </View>
-      {yogaClasses.length > 0 ? (
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#888" />
+      ) : error ? (
+        <ThemedText>{error}</ThemedText>
+      ) : yogaClasses.length > 0 ? (
         <FlatList
           data={yogaClasses}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           horizontal
-          contentContainerStyle={{ paddingHorizontal: 8 }}
+          contentContainerStyle={{ gap: 8 }}
           showsHorizontalScrollIndicator={false}
         />
       ) : (
