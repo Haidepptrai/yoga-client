@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   TouchableOpacity,
@@ -7,39 +7,58 @@ import {
   Text,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  QuerySnapshot,
+  DocumentData,
+} from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 import { YogaCourse } from "@/interface/YogaCourse";
 import { YogaSession } from "@/interface/YogaSession";
 
 interface SearchBarProps {
-  onSearchResults?: (joined: boolean, results: YogaSession[]) => void; // Adjust type as per actual usage
+  onSearchResults?: (joined: boolean, results: YogaSession[]) => void;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
   const [keyword, setKeyword] = useState("");
-  const [showJoined, setShowJoined] = useState(false); // Toggle for joined classes
+  const [showJoined, setShowJoined] = useState(false);
+  const [unsubscribeJoined, setUnsubscribeJoined] = useState<(() => void) | null>(
+    null
+  );
+  const [unsubscribeCourses, setUnsubscribeCourses] = useState<(() => void) | null>(
+    null
+  );
 
-  const handleSearch = async () => {
-    try {
-      if (showJoined) {
-        // Fetch user_joined_class
-        const joinedClassesRef = collection(db, "user_joined_class");
-        const joinedSnapshot = await getDocs(joinedClassesRef);
+  const handleSearch = () => {
+    if (unsubscribeJoined) unsubscribeJoined(); // Unsubscribe previous listeners
+    if (unsubscribeCourses) unsubscribeCourses();
 
-        if (joinedSnapshot.empty) {
-          console.warn("No joined classes found.");
-          onSearchResults && onSearchResults(true, []);
-          return;
-        }
+    if (showJoined) {
+      fetchJoinedClasses();
+    } else {
+      fetchCourses();
+    }
+  };
 
-        const joinedClasses = joinedSnapshot.docs.map((doc) => doc.data());
+  const fetchJoinedClasses = () => {
+    const joinedClassesRef = collection(db, "user_joined_class");
+    const unsubscribe = onSnapshot(joinedClassesRef, async (snapshot: QuerySnapshot<DocumentData>) => {
+      if (snapshot.empty) {
+        console.warn("No joined classes found.");
+        onSearchResults && onSearchResults(true, []);
+        return;
+      }
 
-        const sessionIds = joinedClasses.map((joined) => joined.classId);
-        const sessionsRef = collection(db, "yoga_sessions");
-        const sessionsQuery = query(sessionsRef, where("id", "in", sessionIds));
-        const sessionsSnapshot = await getDocs(sessionsQuery);
+      const joinedClasses = snapshot.docs.map((doc) => doc.data());
+      const sessionIds = joinedClasses.map((joined) => joined.classId);
 
+      const sessionsRef = collection(db, "yoga_sessions");
+      const sessionsQuery = query(sessionsRef, where("id", "in", sessionIds));
+      onSnapshot(sessionsQuery, async (sessionsSnapshot) => {
         if (sessionsSnapshot.empty) {
           console.warn("No sessions found.");
           onSearchResults && onSearchResults(true, []);
@@ -54,57 +73,55 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
         const courseIds = sessions.map((session) => session.courseId);
         const coursesRef = collection(db, "yoga_courses");
         const coursesQuery = query(coursesRef, where("id", "in", courseIds));
-        const coursesSnapshot = await getDocs(coursesQuery);
+        onSnapshot(coursesQuery, (coursesSnapshot) => {
+          const courses = coursesSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as unknown as YogaCourse[];
 
-        const courses = coursesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as unknown as YogaCourse[];
+          const mergedResults = sessions.map((session) => {
+            const course = courses.find((course) => course.id === session.courseId);
+            return {
+              ...session,
+              timeOfCourse: course?.timeOfCourse || "No Time",
+              duration: course?.duration || 0,
+              typeOfClass: course?.typeOfClass || "Unknown Class",
+              description: course?.description || "No description available",
+            };
+          });
 
-        // Merge sessions with courses
-        const mergedResults = sessions.map((session) => {
-          const course = courses.find(
-            (course) => course.id === session.courseId
-          );
-          return {
-            ...session,
-            timeOfCourse: course?.timeOfCourse || "No Time",
-            duration: course?.duration || 0,
-            typeOfClass: course?.typeOfClass || "Unknown Class",
-            description: course?.description || "No description available",
-          };
+          onSearchResults && onSearchResults(true, mergedResults);
         });
+      });
+    });
 
-        onSearchResults && onSearchResults(true, mergedResults);
-      } else {
-        // Fetch regular courses based on search keyword
-        const coursesRef = collection(db, "yoga_courses");
-        const coursesQuery = query(
-          coursesRef,
-          where("typeOfClass", ">=", keyword),
-          where("typeOfClass", "<", keyword + "\uf8ff")
-        );
-        const coursesSnapshot = await getDocs(coursesQuery);
+    setUnsubscribeJoined(() => unsubscribe); // Save the unsubscribe function
+  };
 
-        if (coursesSnapshot.empty) {
-          console.warn("No courses found.");
-          onSearchResults && onSearchResults(false, []);
-          return;
-        }
+  const fetchCourses = () => {
+    const coursesRef = collection(db, "yoga_courses");
+    const coursesQuery = query(
+      coursesRef,
+      where("typeOfClass", ">=", keyword),
+      where("typeOfClass", "<", keyword + "\uf8ff")
+    );
 
-        const courses = coursesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as unknown as YogaCourse[];
+    const unsubscribe = onSnapshot(coursesQuery, async (coursesSnapshot) => {
+      if (coursesSnapshot.empty) {
+        console.warn("No courses found.");
+        onSearchResults && onSearchResults(false, []);
+        return;
+      }
 
-        const courseIds = courses.map((course) => course.id);
-        const sessionsRef = collection(db, "yoga_sessions");
-        const sessionsQuery = query(
-          sessionsRef,
-          where("courseId", "in", courseIds)
-        );
-        const sessionsSnapshot = await getDocs(sessionsQuery);
+      const courses = coursesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as unknown as YogaCourse[];
 
+      const courseIds = courses.map((course) => course.id);
+      const sessionsRef = collection(db, "yoga_sessions");
+      const sessionsQuery = query(sessionsRef, where("courseId", "in", courseIds));
+      onSnapshot(sessionsQuery, (sessionsSnapshot) => {
         if (sessionsSnapshot.empty) {
           console.warn("No sessions found.");
           onSearchResults && onSearchResults(false, []);
@@ -116,11 +133,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
           ...doc.data(),
         })) as unknown as YogaSession[];
 
-        // Merge sessions with courses
         const mergedResults = sessions.map((session) => {
-          const course = courses.find(
-            (course) => course.id === session.courseId
-          );
+          const course = courses.find((course) => course.id === session.courseId);
           return {
             ...session,
             timeOfCourse: course?.timeOfCourse || "No Time",
@@ -131,45 +145,45 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearchResults }) => {
         });
 
         onSearchResults && onSearchResults(false, mergedResults);
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
+      });
+    });
+
+    setUnsubscribeCourses(() => unsubscribe); // Save the unsubscribe function
   };
 
   return (
-    <>
-      <View style={styles.container}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder={
-              showJoined
-                ? "Click search button to show joined course..."
-                : "Type course type..."
-            }
-            value={keyword}
-            onChangeText={(text) => setKeyword(text)}
-            editable={!showJoined} // Disable input when viewing joined classes
-          />
-          <TouchableOpacity style={styles.iconContainer} onPress={handleSearch}>
-            <FontAwesome name="search" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => {
-            setShowJoined((prev) => !prev);
-            setKeyword("");
-            onSearchResults && onSearchResults(showJoined, []);
-          }}
-        >
-          <Text style={styles.toggleText}>
-            {showJoined ? "Show All Classes" : "Show Joined Classes"}
-          </Text>
+    <View style={styles.container}>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder={
+            showJoined
+              ? "Click search button to show joined class"
+              : "Type course type..."
+          }
+          value={keyword}
+          onChangeText={(text) => setKeyword(text)}
+          editable={!showJoined} // Disable input when viewing joined classes
+        />
+        <TouchableOpacity style={styles.iconContainer} onPress={handleSearch}>
+          <FontAwesome name="search" size={20} color="#888" />
         </TouchableOpacity>
       </View>
-    </>
+      <TouchableOpacity
+        style={styles.toggleButton}
+        onPress={() => {
+          setShowJoined((prev) => !prev);
+          setKeyword("");
+          if (unsubscribeJoined) unsubscribeJoined(); // Clear previous listeners
+          if (unsubscribeCourses) unsubscribeCourses();
+          onSearchResults && onSearchResults(showJoined, []);
+        }}
+      >
+        <Text style={styles.toggleText}>
+          {showJoined ? "Show All Classes" : "Show Joined Classes"}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
